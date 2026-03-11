@@ -12,6 +12,10 @@ export type ContentTypeEnum =
   | 'blog'
   | 'whitepaper'
   | 'ebook'
+  | 'poster'
+  | 'catalogue'
+  | 'flier'
+  | 'graphic'
   | 'other';
 
 export type AudienceTagEnum =

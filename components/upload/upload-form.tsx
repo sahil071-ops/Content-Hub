@@ -6,8 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Save, Globe, Upload, FileText } from 'lucide-react';
-import Image from 'next/image';
+import { Loader2, Save, Upload, Plus, X, Check } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,17 +21,23 @@ import { UploadZone } from '@/components/upload/upload-zone';
 import { YouTubeInput } from '@/components/upload/youtube-input';
 import { BlogUrlInput, type ArchivedBlogData } from '@/components/upload/blog-url-input';
 import { generatePdfThumbnail } from '@/components/content/pdf-viewer';
+import { createClient } from '@/lib/supabase/client';
 
-import { CONTENT_TYPE_LABELS, AUDIENCE_LABELS, buildFilePath } from '@/lib/utils';
-import type { ContentTypeEnum, AudienceTagEnum, TagRow } from '@/types/database';
+import { CONTENT_TYPE_LABELS, AUDIENCE_LABELS } from '@/lib/utils';
+import type { ContentTypeEnum, AudienceTagEnum, TagRow, ContentItem } from '@/types/database';
 
 const CONTENT_TYPES = Object.keys(CONTENT_TYPE_LABELS) as ContentTypeEnum[];
 const AUDIENCE_TYPES = Object.keys(AUDIENCE_LABELS) as AudienceTagEnum[];
 
+const TAG_PRESET_COLORS = [
+  '#6366f1', '#0ea5e9', '#10b981', '#f59e0b',
+  '#ef4444', '#8b5cf6', '#ec4899', '#3D3D3D',
+];
+
 const schema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
   description: z.string().optional(),
-  content_type: z.enum(['video', 'pdf', 'image', 'presentation', 'emailer', 'blog', 'whitepaper', 'ebook', 'other'] as const),
+  content_type: z.enum(CONTENT_TYPES as [ContentTypeEnum, ...ContentTypeEnum[]]),
   status: z.enum(['draft', 'published']),
   product_tags: z.array(z.string()).default([]),
   topic_tags: z.array(z.string()).default([]),
@@ -44,19 +49,42 @@ type FormValues = z.infer<typeof schema>;
 interface UploadFormProps {
   productTags: TagRow[];
   topicTags: TagRow[];
+  userRole: 'admin' | 'marketing';
+  initialData?: ContentItem | null;
 }
 
-export function UploadForm({ productTags, topicTags }: UploadFormProps) {
+export function UploadForm({ productTags, topicTags, userRole, initialData }: UploadFormProps) {
   const router = useRouter();
+  const isEdit = !!initialData;
 
+  // ── File / media states ────────────────────────────────────────
   const [file, setFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | undefined>(undefined);
-  const [youtubeData, setYoutubeData] = useState<any>(null);
-  const [blogData, setBlogData] = useState<ArchivedBlogData | null>(null);
+  const [existingFileUrl] = useState<string | null>(initialData?.file_url || null);
+  const [existingThumbnailUrl] = useState<string | null>(initialData?.thumbnail_url || null);
+
+  // Initialise YouTube data from existing item
+  const initYoutubeData = initialData?.content_type === 'video' && initialData.meta?.youtube
+    ? { ...(initialData.meta.youtube as any), title: (initialData.meta.youtube as any).title || initialData.title }
+    : null;
+  const [youtubeData, setYoutubeData] = useState<any>(initYoutubeData);
+
+  // Initialise blog data from existing item
+  const [blogData, setBlogData] = useState<ArchivedBlogData | null>(
+    (initialData?.meta?.archived_blog as ArchivedBlogData) || null
+  );
+
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // ── Tag states ─────────────────────────────────────────────────
+  const [allProductTags, setAllProductTags] = useState<TagRow[]>(productTags);
+  const [allTopicTags, setAllTopicTags] = useState<TagRow[]>(topicTags);
+  const [newTagInput, setNewTagInput] = useState<{ type: 'product' | 'topic'; name: string; color: string } | null>(null);
+  const [tagCreating, setTagCreating] = useState(false);
+
+  // ── Form ───────────────────────────────────────────────────────
   const {
     register,
     handleSubmit,
@@ -66,11 +94,13 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      content_type: 'pdf',
-      status: 'draft',
-      product_tags: [],
-      topic_tags: [],
-      audience_tags: [],
+      title: initialData?.title || '',
+      description: initialData?.description || '',
+      content_type: initialData?.content_type || 'pdf',
+      status: initialData?.status === 'published' ? 'published' : 'draft',
+      product_tags: initialData?.product_tags || [],
+      topic_tags: initialData?.topic_tags || [],
+      audience_tags: (initialData?.audience_tags || []) as string[],
     },
   });
 
@@ -78,10 +108,10 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
   const isVideo = contentType === 'video';
   const isBlog = contentType === 'blog';
 
+  // ── Handlers ───────────────────────────────────────────────────
+
   async function handleFileAccepted(f: File) {
     setFile(f);
-
-    // Auto-generate PDF thumbnail
     if (f.type === 'application/pdf') {
       const thumb = await generatePdfThumbnail(f);
       if (thumb) setThumbnailDataUrl(thumb);
@@ -96,18 +126,53 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
     setValue(field, updated);
   }
 
+  function handleYoutubeData(data: any) {
+    setYoutubeData(data);
+    if (data) {
+      if (!watch('title') && data.title) setValue('title', data.title);
+      if (!watch('description') && data.description) setValue('description', data.description);
+    }
+  }
+
+  async function createTag() {
+    if (!newTagInput?.name.trim()) return;
+    setTagCreating(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('tags_master')
+        .insert({ name: newTagInput.name.trim(), tag_type: newTagInput.type, color: newTagInput.color })
+        .select('*')
+        .single();
+      if (error) throw new Error(error.message);
+      if (data) {
+        if (newTagInput.type === 'product') {
+          setAllProductTags(prev => [...prev, data as TagRow].sort((a, b) => a.name.localeCompare(b.name)));
+          toggleArrayValue('product_tags', data.name);
+        } else {
+          setAllTopicTags(prev => [...prev, data as TagRow].sort((a, b) => a.name.localeCompare(b.name)));
+          toggleArrayValue('topic_tags', data.name);
+        }
+        toast.success(`Tag "${data.name}" created`);
+        setNewTagInput(null);
+      }
+    } catch (err) {
+      toast.error('Failed to create tag', { description: err instanceof Error ? err.message : undefined });
+    } finally {
+      setTagCreating(false);
+    }
+  }
+
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
     setSubmitError(null);
 
     try {
-      let fileUrl: string | undefined;
-      let filePath: string | undefined;
-      let thumbnailUrl: string | undefined;
+      let fileUrl: string | undefined = existingFileUrl || undefined;
+      let thumbnailUrl: string | undefined = existingThumbnailUrl || youtubeData?.thumbnail_url || undefined;
 
-      // ── Step 1: Upload file to R2 (if file selected) ──────────
+      // ── Upload new file to R2 (only if a new file was selected) ──
       if (file) {
-        // Get presigned URL
         const presignRes = await fetch('/api/upload/presign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -117,110 +182,100 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
             content_type: values.content_type,
           }),
         });
-
         const presignJson = await presignRes.json();
         if (!presignRes.ok) {
-          setSubmitError(presignJson.error || 'Failed to prepare file upload. Check your R2 credentials.');
+          setSubmitError(presignJson.error || 'Failed to prepare file upload.');
           return;
         }
-
-        const { upload_url, file_path, public_url } = presignJson;
-        filePath = file_path;
+        const { upload_url, public_url } = presignJson;
         fileUrl = public_url;
 
-        // Upload with progress tracking via XMLHttpRequest
         await new Promise<void>((resolve, reject) => {
           const xhr = new XMLHttpRequest();
           xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              setUploadProgress(Math.round((e.loaded / e.total) * 100));
-            }
+            if (e.lengthComputable) setUploadProgress(Math.round((e.loaded / e.total) * 100));
           };
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) resolve();
-            else reject(new Error(`R2 upload failed with status ${xhr.status}. Check your R2 credentials and bucket configuration.`));
-          };
-          xhr.onerror = () => reject(new Error('Network error during file upload. Please check your connection and try again.'));
+          xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
+          xhr.onerror = () => reject(new Error('Network error during upload.'));
           xhr.open('PUT', upload_url);
           xhr.setRequestHeader('Content-Type', file.type);
           xhr.send(file);
         });
 
-        // Upload PDF thumbnail if generated
         if (thumbnailDataUrl && file.type === 'application/pdf') {
           const thumbBlob = await dataUrlToBlob(thumbnailDataUrl);
           const thumbPresignRes = await fetch('/api/upload/presign', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              filename: `thumb-${file.name}.jpg`,
-              content_type_mime: 'image/jpeg',
-              content_type: 'image',
-            }),
+            body: JSON.stringify({ filename: `thumb-${file.name}.jpg`, content_type_mime: 'image/jpeg', content_type: 'image' }),
           });
           if (thumbPresignRes.ok) {
-            const { upload_url: thumbUploadUrl, public_url: thumbPublicUrl } = await thumbPresignRes.json();
-            await fetch(thumbUploadUrl, { method: 'PUT', body: thumbBlob, headers: { 'Content-Type': 'image/jpeg' } });
-            thumbnailUrl = thumbPublicUrl;
+            const { upload_url: tUrl, public_url: tPublicUrl } = await thumbPresignRes.json();
+            await fetch(tUrl, { method: 'PUT', body: thumbBlob, headers: { 'Content-Type': 'image/jpeg' } });
+            thumbnailUrl = tPublicUrl;
           }
         }
       }
 
-      // ── Step 2: Build meta object ──────────────────────────────
-      const meta: Record<string, unknown> = {};
+      // ── Build meta ──────────────────────────────────────────────
+      const meta: Record<string, unknown> = isEdit ? { ...(initialData?.meta || {}) } : {};
       if (youtubeData) meta.youtube = youtubeData;
+      else if (isVideo) delete meta.youtube;
       if (blogData) meta.archived_blog = blogData;
+      else if (isBlog) delete meta.archived_blog;
 
-      // ── Step 3: Save to database ───────────────────────────────
+      const externalLink = youtubeData
+        ? `https://youtube.com/watch?v=${youtubeData.video_id}`
+        : blogData?.url || (isEdit ? initialData?.external_link : undefined);
+
+      const body = {
+        ...(isEdit && { id: initialData!.id }),
+        ...values,
+        file_url: fileUrl,
+        external_link: externalLink,
+        thumbnail_url: thumbnailUrl,
+        file_size_bytes: file?.size ?? (isEdit ? initialData?.file_size_bytes ?? undefined : undefined),
+        file_type_mime: file?.type ?? (isEdit ? initialData?.file_type ?? undefined : undefined),
+        meta,
+      };
+
       const completeRes = await fetch('/api/upload/complete', {
-        method: 'POST',
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...values,
-          file_url: fileUrl,
-          file_path: filePath,
-          external_link: youtubeData
-            ? `https://youtube.com/watch?v=${youtubeData.video_id}`
-            : blogData?.url,
-          thumbnail_url: thumbnailUrl || youtubeData?.thumbnail_url,
-          file_size_bytes: file?.size,
-          file_type_mime: file?.type,
-          meta,
-        }),
+        body: JSON.stringify(body),
       });
-
       const completeJson = await completeRes.json();
       if (!completeRes.ok) {
-        setSubmitError(completeJson.error || 'Failed to save content metadata. Please try again.');
+        setSubmitError(completeJson.error || 'Failed to save content.');
         return;
       }
 
-      const { id: newId } = completeJson;
+      const { id: savedId } = completeJson;
 
-      // ── Step 4: Trigger async B2 backup (fire and forget) ─────
-      if (fileUrl && filePath) {
+      // Trigger B2 backup for new uploads only
+      if (!isEdit && fileUrl && file) {
         fetch('/api/backup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content_id: newId, file_url: fileUrl, file_path: filePath, file_type: file?.type }),
-        }).catch(() => {
-          // Backup is non-blocking — failure is logged server-side
-        });
+          body: JSON.stringify({ content_id: savedId, file_url: fileUrl, file_type: file.type }),
+        }).catch(() => {});
       }
 
-      toast.success('Content saved!', {
+      toast.success(isEdit ? 'Content updated!' : 'Content saved!', {
         description: values.status === 'published' ? 'Published successfully.' : 'Saved as draft.',
       });
-      router.push(`/library/${newId}`);
+      router.push(`/library/${savedId}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'An unexpected error occurred.';
       setSubmitError(msg);
-      toast.error('Upload failed', { description: msg });
+      toast.error(isEdit ? 'Update failed' : 'Upload failed', { description: msg });
     } finally {
       setSubmitting(false);
       setUploadProgress(undefined);
     }
   }
+
+  // ── Render ─────────────────────────────────────────────────────
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -236,7 +291,7 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
         <div className="space-y-2">
           <Label>Type</Label>
           <Select
-            defaultValue="pdf"
+            value={contentType}
             onValueChange={(val) => {
               setValue('content_type', val as ContentTypeEnum);
               setFile(null);
@@ -264,8 +319,15 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
           {isVideo ? 'Video Link' : isBlog ? 'File or Blog URL' : 'File'}
         </h2>
 
+        {isEdit && existingFileUrl && !file && !isVideo && !isBlog && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 rounded-lg px-3 py-2 border">
+            <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+            <span>Existing file attached. Upload a new file below to replace it.</span>
+          </div>
+        )}
+
         {isVideo ? (
-          <YouTubeInput onData={setYoutubeData} data={youtubeData} />
+          <YouTubeInput onData={handleYoutubeData} data={youtubeData} />
         ) : isBlog ? (
           <div className="space-y-4">
             <UploadZone
@@ -276,9 +338,7 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
               disabled={submitting}
             />
             <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-background px-2 text-muted-foreground">and / or</span>
               </div>
@@ -295,7 +355,6 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
           />
         )}
 
-        {/* Thumbnail preview */}
         {thumbnailDataUrl && (
           <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
             <img src={thumbnailDataUrl} alt="Auto-generated thumbnail" className="h-16 w-24 object-cover rounded" />
@@ -319,7 +378,6 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
             id="title"
             placeholder="Enter a descriptive title"
             {...register('title')}
-            defaultValue={youtubeData?.title || blogData?.title || ''}
           />
           {errors.title && <p className="text-xs text-destructive">{errors.title.message}</p>}
         </div>
@@ -331,7 +389,6 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
             placeholder="Brief description of this content (optional)"
             rows={3}
             {...register('description')}
-            defaultValue={blogData?.description || ''}
           />
         </div>
       </section>
@@ -343,62 +400,105 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Tags</h2>
 
         {/* Product Tags */}
-        {productTags.length > 0 && (
-          <div className="space-y-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
             <Label>Product Tags</Label>
-            <div className="flex flex-wrap gap-2">
-              {productTags.map((tag) => {
-                const checked = (watch('product_tags') as string[]).includes(tag.name);
-                return (
-                  <label
-                    key={tag.id}
-                    className={`flex items-center gap-1.5 cursor-pointer rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                      checked ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={() => toggleArrayValue('product_tags', tag.name)}
-                      className="h-3.5 w-3.5"
-                    />
-                    <span
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: tag.color }}
-                    />
-                    {tag.name}
-                  </label>
-                );
-              })}
-            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => setNewTagInput({ type: 'product', name: '', color: TAG_PRESET_COLORS[0] })}
+            >
+              <Plus className="h-3 w-3" /> New tag
+            </Button>
           </div>
-        )}
+
+          {newTagInput?.type === 'product' && (
+            <InlineTagForm
+              value={newTagInput}
+              onChange={(v) => setNewTagInput(prev => prev ? { ...prev, ...v } : null)}
+              onSubmit={createTag}
+              onCancel={() => setNewTagInput(null)}
+              loading={tagCreating}
+            />
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {allProductTags.map((tag) => {
+              const checked = (watch('product_tags') as string[]).includes(tag.name);
+              return (
+                <label
+                  key={tag.id}
+                  className={`flex items-center gap-1.5 cursor-pointer rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                    checked ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggleArrayValue('product_tags', tag.name)}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                  {tag.name}
+                </label>
+              );
+            })}
+            {allProductTags.length === 0 && newTagInput?.type !== 'product' && (
+              <p className="text-xs text-muted-foreground">No product tags yet. Click &quot;New tag&quot; to add one.</p>
+            )}
+          </div>
+        </div>
 
         {/* Topic Tags */}
-        {topicTags.length > 0 && (
-          <div className="space-y-2">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
             <Label>Topic Tags</Label>
-            <div className="flex flex-wrap gap-2">
-              {topicTags.map((tag) => {
-                const checked = (watch('topic_tags') as string[]).includes(tag.name);
-                return (
-                  <label
-                    key={tag.id}
-                    className={`flex items-center gap-1.5 cursor-pointer rounded-md border px-3 py-1.5 text-sm transition-colors ${
-                      checked ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={() => toggleArrayValue('topic_tags', tag.name)}
-                      className="h-3.5 w-3.5"
-                    />
-                    {tag.name}
-                  </label>
-                );
-              })}
-            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => setNewTagInput({ type: 'topic', name: '', color: TAG_PRESET_COLORS[1] })}
+            >
+              <Plus className="h-3 w-3" /> New tag
+            </Button>
           </div>
-        )}
+
+          {newTagInput?.type === 'topic' && (
+            <InlineTagForm
+              value={newTagInput}
+              onChange={(v) => setNewTagInput(prev => prev ? { ...prev, ...v } : null)}
+              onSubmit={createTag}
+              onCancel={() => setNewTagInput(null)}
+              loading={tagCreating}
+            />
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {allTopicTags.map((tag) => {
+              const checked = (watch('topic_tags') as string[]).includes(tag.name);
+              return (
+                <label
+                  key={tag.id}
+                  className={`flex items-center gap-1.5 cursor-pointer rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                    checked ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggleArrayValue('topic_tags', tag.name)}
+                    className="h-3.5 w-3.5"
+                  />
+                  {tag.name}
+                </label>
+              );
+            })}
+            {allTopicTags.length === 0 && newTagInput?.type !== 'topic' && (
+              <p className="text-xs text-muted-foreground">No topic tags yet. Click &quot;New tag&quot; to add one.</p>
+            )}
+          </div>
+        </div>
 
         {/* Audience Tags */}
         <div className="space-y-2">
@@ -453,11 +553,56 @@ export function UploadForm({ productTags, topicTags }: UploadFormProps) {
             className="bg-[#2323A3] hover:bg-[#2323A3]/90"
           >
             {submitting && watch('status') === 'published' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-            Publish
+            {isEdit ? 'Update & Publish' : 'Publish'}
           </Button>
         </div>
       </section>
     </form>
+  );
+}
+
+// ── Inline tag creation form ──────────────────────────────────────
+
+interface InlineTagFormProps {
+  value: { name: string; color: string };
+  onChange: (v: Partial<{ name: string; color: string }>) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  loading: boolean;
+}
+
+function InlineTagForm({ value, onChange, onSubmit, onCancel, loading }: InlineTagFormProps) {
+  return (
+    <div className="flex items-center gap-2 p-2 rounded-lg border bg-muted/20">
+      <Input
+        placeholder="Tag name"
+        value={value.name}
+        onChange={(e) => onChange({ name: e.target.value })}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); onSubmit(); }
+          if (e.key === 'Escape') onCancel();
+        }}
+        className="h-7 text-sm flex-1"
+        autoFocus
+      />
+      <div className="flex gap-1 shrink-0">
+        {['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#3D3D3D'].map((c) => (
+          <button
+            key={c}
+            type="button"
+            className={`h-5 w-5 rounded-full border-2 transition-transform ${value.color === c ? 'border-foreground scale-110' : 'border-transparent'}`}
+            style={{ backgroundColor: c }}
+            onClick={() => onChange({ color: c })}
+          />
+        ))}
+      </div>
+      <Button type="button" size="sm" className="h-7 px-2" onClick={onSubmit} disabled={loading || !value.name.trim()}>
+        {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+      </Button>
+      <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={onCancel}>
+        <X className="h-3 w-3" />
+      </Button>
+    </div>
   );
 }
 

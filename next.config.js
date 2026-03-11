@@ -1,8 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Expose git commit SHA as a public env var for the version display
+  env: {
+    NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || '',
+  },
+
   // Unique build ID per deployment — invalidates old service workers
   generateBuildId: async () => {
-    return `build-${Date.now()}`;
+    return process.env.VERCEL_GIT_COMMIT_SHA || `build-${Date.now()}`;
   },
 
   images: {

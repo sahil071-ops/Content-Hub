@@ -45,12 +45,31 @@ export async function GET(request: NextRequest) {
     // Get the highest quality thumbnail available
     const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
+    // Try to fetch the video description from the YouTube page meta tags
+    let description: string | null = null;
+    try {
+      const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AxisContentHub/1.0)' },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (pageRes.ok) {
+        const html = await pageRes.text();
+        const match =
+          html.match(/<meta name="description" content="([^"]*)"/) ||
+          html.match(/<meta property="og:description" content="([^"]*)"/);
+        if (match?.[1]) description = match[1];
+      }
+    } catch {
+      // Description is optional — ignore failures
+    }
+
     return NextResponse.json({
       video_id: videoId,
       title: data.title,
       author_name: data.author_name,
       thumbnail_url: thumbnailUrl,
       embed_html: data.html,
+      description,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

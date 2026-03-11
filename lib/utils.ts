@@ -49,6 +49,10 @@ export const CONTENT_TYPE_LABELS: Record<ContentTypeEnum, string> = {
   blog: 'Blog / Article',
   whitepaper: 'Whitepaper',
   ebook: 'eBook',
+  poster: 'Poster',
+  catalogue: 'Catalogue',
+  flier: 'Flier',
+  graphic: 'Graphic',
   other: 'Other',
 };
 
@@ -61,6 +65,10 @@ export const CONTENT_TYPE_COLORS: Record<ContentTypeEnum, string> = {
   blog: 'bg-blue-100 text-blue-700 border-blue-200',
   whitepaper: 'bg-indigo-100 text-indigo-700 border-indigo-200',
   ebook: 'bg-pink-100 text-pink-700 border-pink-200',
+  poster: 'bg-teal-100 text-teal-700 border-teal-200',
+  catalogue: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+  flier: 'bg-lime-100 text-lime-700 border-lime-200',
+  graphic: 'bg-violet-100 text-violet-700 border-violet-200',
   other: 'bg-gray-100 text-gray-700 border-gray-200',
 };
 

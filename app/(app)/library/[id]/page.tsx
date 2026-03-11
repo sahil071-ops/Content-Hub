@@ -141,18 +141,20 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
           {/* Archived blog content */}
           {archivedBlog?.text_content && (
             <div className="rounded-lg border bg-card p-6">
-              <div className="flex items-center gap-2 mb-4 text-sm text-muted-foreground">
-                <Globe className="h-4 w-4" />
-                <span>Archived from: </span>
-                <a href={archivedBlog.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate max-w-xs">
-                  {archivedBlog.url}
-                </a>
+              <div className="flex items-start justify-between gap-2 mb-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                  <Globe className="h-4 w-4 shrink-0" />
+                  <span className="shrink-0">Archived from:</span>
+                  <a href={archivedBlog.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline truncate">
+                    {archivedBlog.url}
+                  </a>
+                </div>
               </div>
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-4">
+                Images are not archived. Use &ldquo;Open Original&rdquo; to view the full article with images.
+              </p>
               <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground/80 whitespace-pre-wrap">
-                {archivedBlog.text_content.slice(0, 3000)}
-                {archivedBlog.text_content.length > 3000 && (
-                  <span className="text-muted-foreground"> ... (content truncated for preview)</span>
-                )}
+                {archivedBlog.text_content}
               </div>
             </div>
           )}
