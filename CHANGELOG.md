@@ -6,6 +6,17 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [v0.1.1] — 2026-03-11
+
+### Fixed
+- **Auth callback route missing**: Added `/app/auth/callback/route.ts` to exchange Supabase PKCE auth codes for sessions. Without this, magic link sign-in redirected users back to `/login` as if unauthenticated.
+- **Login redirect URL**: Changed `emailRedirectTo` from `/library` to `/auth/callback?next=/library` so Supabase correctly routes through the code exchange handler.
+- **Expired link error**: Login page now shows a human-readable message ("The sign-in link has expired or already been used") when redirected back after a failed callback.
+- **Middleware public paths**: Added `/auth/callback` to the list of paths that don't require authentication, so the callback route itself is accessible.
+- **Setup guide**: Added Step 19 explaining how to whitelist `{app-url}/auth/callback` in Supabase Auth → URL Configuration → Redirect URLs (required for magic links to work).
+
+---
+
 ## [v0.1.0] — 2026-03-11
 
 ### Added — Phase 1 Initial Build

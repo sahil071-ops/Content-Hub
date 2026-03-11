@@ -254,7 +254,24 @@ This is where you enter all the credentials from the previous steps.
 
 This is how you become the administrator of the application.
 
-### Step 19: Sign In for the First Time
+### Step 19: Configure Supabase Auth Redirect URLs
+
+**This step is required for sign-in to work.** Supabase only sends magic links to whitelisted callback URLs.
+
+1. Go to **Supabase** → your project → **Authentication** → **URL Configuration**
+2. Under **Site URL**, enter your app URL:
+   ```
+   https://your-actual-url.vercel.app
+   ```
+3. Under **Redirect URLs**, click **Add URL** and add:
+   ```
+   https://your-actual-url.vercel.app/auth/callback
+   ```
+4. Click **Save**
+
+> **Why is this needed?** When a user clicks the magic link in their email, Supabase redirects them to `/auth/callback` on your app. Supabase requires this URL to be whitelisted for security — without it, sign-in links will fail.
+
+### Step 20: Sign In for the First Time
 
 1. Go to your live app URL (e.g. `https://axis-content-hub.vercel.app`)
 2. You'll see the sign-in screen
@@ -264,7 +281,7 @@ This is how you become the administrator of the application.
    - If still nothing, check Supabase → Authentication → Email Templates to verify email sending is enabled
 5. Click the link in the email — you'll be signed in automatically
 
-### Step 20: Promote Yourself to Admin
+### Step 21: Promote Yourself to Admin
 
 When you first sign in, your account is created with the `viewer` role (the most limited role). You need to manually promote yourself to Admin.
 
@@ -292,7 +309,7 @@ where id = 'paste-your-uuid-here';
 
 ## PART 7 — Inviting Your Team
 
-### Step 21: Invite Team Members
+### Step 22: Invite Team Members
 
 Now that you're an Admin:
 
@@ -312,7 +329,7 @@ Now that you're an Admin:
 
 Before your team starts uploading, set up your product and topic tags.
 
-### Step 22: Create Your First Tags
+### Step 23: Create Your First Tags
 
 1. Go to **Administration → Tag Management**
 2. Click **New Tag**
@@ -327,7 +344,7 @@ Before your team starts uploading, set up your product and topic tags.
 
 ## PART 9 — Uploading Your First Piece of Content
 
-### Step 23: Your First Upload
+### Step 24: Your First Upload
 
 1. Click **Upload Content** in the sidebar
 2. Select a content type (e.g. PDF)

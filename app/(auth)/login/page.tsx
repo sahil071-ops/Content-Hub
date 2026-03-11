@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Building2, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,10 +11,16 @@ import { createClient } from '@/lib/supabase/client';
 import { APP_NAME, VERSION } from '@/lib/version';
 
 export default function LoginPage() {
+  const searchParams = useSearchParams();
+  const callbackError = searchParams.get('error');
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    callbackError === 'auth_callback_error'
+      ? 'The sign-in link has expired or already been used. Please request a new one.'
+      : null
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,7 +31,7 @@ export default function LoginPage() {
     const { error: authError } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/library`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/library`,
       },
     });
 
