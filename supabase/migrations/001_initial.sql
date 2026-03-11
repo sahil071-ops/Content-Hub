@@ -1,41 +1,59 @@
 -- ============================================================
--- AXIS CONTENT HUB — Initial Database Migration
--- Run this entire file in Supabase SQL Editor
+-- AXIS CONTENT HUB — Initial Database Migration (Idempotent)
+-- Safe to re-run. Run this entire file in Supabase SQL Editor
 -- ============================================================
 
 -- ── Enable required extensions ────────────────────────────────
 create extension if not exists "uuid-ossp";
 create extension if not exists "pg_trgm"; -- for full-text search
 
--- ── Enums ─────────────────────────────────────────────────────
+-- ── Enums (safe to re-run) ─────────────────────────────────────
 
-create type content_type_enum as enum (
-  'video', 'pdf', 'image', 'presentation', 'emailer',
-  'blog', 'whitepaper', 'ebook', 'other'
-);
+do $$ begin
+  create type content_type_enum as enum (
+    'video', 'pdf', 'image', 'presentation', 'emailer',
+    'blog', 'whitepaper', 'ebook', 'other'
+  );
+exception when duplicate_object then null;
+end $$;
 
-create type audience_tag_enum as enum (
-  'internal', 'sales', 'distributor', 'end-client', 'public'
-);
+do $$ begin
+  create type audience_tag_enum as enum (
+    'internal', 'sales', 'distributor', 'end-client', 'public'
+  );
+exception when duplicate_object then null;
+end $$;
 
-create type content_status_enum as enum (
-  'draft', 'published', 'archived'
-);
+do $$ begin
+  create type content_status_enum as enum (
+    'draft', 'published', 'archived'
+  );
+exception when duplicate_object then null;
+end $$;
 
-create type user_role_enum as enum (
-  'admin', 'marketing', 'sales', 'distributor', 'viewer'
-);
+do $$ begin
+  create type user_role_enum as enum (
+    'admin', 'marketing', 'sales', 'distributor', 'viewer'
+  );
+exception when duplicate_object then null;
+end $$;
 
-create type tag_type_enum as enum (
-  'product', 'topic', 'audience', 'content_type'
-);
+do $$ begin
+  create type tag_type_enum as enum (
+    'product', 'topic', 'audience', 'content_type'
+  );
+exception when duplicate_object then null;
+end $$;
 
-create type backup_status_enum as enum (
-  'success', 'failed', 'pending'
-);
+do $$ begin
+  create type backup_status_enum as enum (
+    'success', 'failed', 'pending'
+  );
+exception when duplicate_object then null;
+end $$;
 
 -- ── users table (extends auth.users) ─────────────────────────
-create table public.users (
+create table if not exists public.users (
   id          uuid primary key references auth.users(id) on delete cascade,
   full_name   text,
   role        user_role_enum not null default 'viewer',
@@ -46,7 +64,7 @@ create table public.users (
 comment on table public.users is 'App user profiles linked to Supabase auth.users';
 
 -- ── tags_master ───────────────────────────────────────────────
-create table public.tags_master (
+create table if not exists public.tags_master (
   id         uuid primary key default uuid_generate_v4(),
   name       text not null,
   tag_type   tag_type_enum not null,
@@ -58,7 +76,7 @@ create table public.tags_master (
 comment on table public.tags_master is 'Master list of all tags (products, topics, etc.)';
 
 -- ── content_items ─────────────────────────────────────────────
-create table public.content_items (
+create table if not exists public.content_items (
   id               uuid primary key default uuid_generate_v4(),
   title            text not null,
   description      text,
@@ -97,24 +115,25 @@ begin
 end;
 $$;
 
+drop trigger if exists content_items_updated_at on public.content_items;
 create trigger content_items_updated_at
   before update on public.content_items
   for each row execute function update_updated_at();
 
 -- Full-text search index
-create index content_items_search_idx on public.content_items
+create index if not exists content_items_search_idx on public.content_items
   using gin(to_tsvector('english', coalesce(title, '') || ' ' || coalesce(description, '')));
 
 -- Status + type indexes for filtering
-create index content_items_status_idx on public.content_items(status);
-create index content_items_type_idx on public.content_items(content_type);
-create index content_items_created_at_idx on public.content_items(created_at desc);
-create index content_items_product_tags_idx on public.content_items using gin(product_tags);
-create index content_items_topic_tags_idx on public.content_items using gin(topic_tags);
-create index content_items_audience_tags_idx on public.content_items using gin(audience_tags);
+create index if not exists content_items_status_idx on public.content_items(status);
+create index if not exists content_items_type_idx on public.content_items(content_type);
+create index if not exists content_items_created_at_idx on public.content_items(created_at desc);
+create index if not exists content_items_product_tags_idx on public.content_items using gin(product_tags);
+create index if not exists content_items_topic_tags_idx on public.content_items using gin(topic_tags);
+create index if not exists content_items_audience_tags_idx on public.content_items using gin(audience_tags);
 
 -- ── content_views (analytics foundation for Phase 3) ─────────
-create table public.content_views (
+create table if not exists public.content_views (
   id          uuid primary key default uuid_generate_v4(),
   content_id  uuid not null references public.content_items(id) on delete cascade,
   viewer_role user_role_enum,
@@ -123,11 +142,11 @@ create table public.content_views (
 );
 
 comment on table public.content_views is 'Analytics foundation — view events per content item. Populated in Phase 3.';
-create index content_views_content_id_idx on public.content_views(content_id);
-create index content_views_viewed_at_idx on public.content_views(viewed_at desc);
+create index if not exists content_views_content_id_idx on public.content_views(content_id);
+create index if not exists content_views_viewed_at_idx on public.content_views(viewed_at desc);
 
 -- ── backup_logs ───────────────────────────────────────────────
-create table public.backup_logs (
+create table if not exists public.backup_logs (
   id            uuid primary key default uuid_generate_v4(),
   content_id    uuid references public.content_items(id) on delete cascade,
   r2_url        text,
@@ -138,8 +157,8 @@ create table public.backup_logs (
 );
 
 comment on table public.backup_logs is 'Log of every R2→B2 backup attempt';
-create index backup_logs_content_id_idx on public.backup_logs(content_id);
-create index backup_logs_status_idx on public.backup_logs(status);
+create index if not exists backup_logs_content_id_idx on public.backup_logs(content_id);
+create index if not exists backup_logs_status_idx on public.backup_logs(status);
 
 -- ============================================================
 -- ROW LEVEL SECURITY POLICIES
@@ -159,31 +178,34 @@ $$;
 
 -- ── users RLS ─────────────────────────────────────────────────
 
--- Users can read their own profile; admins can read all
+drop policy if exists "users_select" on public.users;
 create policy "users_select" on public.users for select
   using (
     id = auth.uid()
     or get_user_role() = 'admin'
   );
 
--- Users can update their own profile; admins can update all
+drop policy if exists "users_update" on public.users;
 create policy "users_update" on public.users for update
   using (
     id = auth.uid()
     or get_user_role() = 'admin'
   );
 
--- Only service role can insert (handled via trigger on auth.users)
+-- Allow insert for new users being created via trigger (auth.uid() matches new row)
+-- The handle_new_user trigger runs as security definer (postgres) which bypasses RLS,
+-- but this policy also covers admin-driven inserts.
+drop policy if exists "users_insert" on public.users;
 create policy "users_insert" on public.users for insert
-  with check (get_user_role() = 'admin' or id = auth.uid());
+  with check (id = auth.uid() or get_user_role() = 'admin');
 
--- Only admins can delete users
+drop policy if exists "users_delete" on public.users;
 create policy "users_delete" on public.users for delete
   using (get_user_role() = 'admin');
 
 -- ── Auto-create user profile on sign up ───────────────────────
 create or replace function handle_new_user()
-returns trigger language plpgsql security definer as $$
+returns trigger language plpgsql security definer set search_path = public as $$
 begin
   insert into public.users (id, full_name, avatar_url, role)
   values (
@@ -196,36 +218,36 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function handle_new_user();
 
 -- ── tags_master RLS ───────────────────────────────────────────
 
--- All authenticated users can read tags
+drop policy if exists "tags_select" on public.tags_master;
 create policy "tags_select" on public.tags_master for select
   using (auth.role() = 'authenticated');
 
--- Admin and marketing can create/update tags
+drop policy if exists "tags_insert" on public.tags_master;
 create policy "tags_insert" on public.tags_master for insert
   with check (get_user_role() in ('admin', 'marketing'));
 
+drop policy if exists "tags_update" on public.tags_master;
 create policy "tags_update" on public.tags_master for update
   using (get_user_role() in ('admin', 'marketing'));
 
--- Only admins can delete tags
+drop policy if exists "tags_delete" on public.tags_master;
 create policy "tags_delete" on public.tags_master for delete
   using (get_user_role() = 'admin');
 
 -- ── content_items RLS ─────────────────────────────────────────
 
--- SELECT: role-based visibility
+drop policy if exists "content_select" on public.content_items;
 create policy "content_select" on public.content_items for select
   using (
-    -- Admins and marketing see everything
     get_user_role() in ('admin', 'marketing')
     or
-    -- Sales see published content tagged for sales or public
     (
       get_user_role() = 'sales'
       and status = 'published'
@@ -235,7 +257,6 @@ create policy "content_select" on public.content_items for select
       )
     )
     or
-    -- Distributors see published content tagged for distributors or public
     (
       get_user_role() = 'distributor'
       and status = 'published'
@@ -245,7 +266,6 @@ create policy "content_select" on public.content_items for select
       )
     )
     or
-    -- Viewers see published public content only
     (
       get_user_role() = 'viewer'
       and status = 'published'
@@ -253,58 +273,56 @@ create policy "content_select" on public.content_items for select
     )
   );
 
--- INSERT: admins and marketing only
+drop policy if exists "content_insert" on public.content_items;
 create policy "content_insert" on public.content_items for insert
   with check (
     get_user_role() in ('admin', 'marketing')
     and created_by = auth.uid()
   );
 
--- UPDATE: admins can update anything; marketing can update their own content
+drop policy if exists "content_update" on public.content_items;
 create policy "content_update" on public.content_items for update
   using (
     get_user_role() = 'admin'
     or (get_user_role() = 'marketing' and created_by = auth.uid())
   );
 
--- DELETE: admins only
+drop policy if exists "content_delete" on public.content_items;
 create policy "content_delete" on public.content_items for delete
   using (get_user_role() = 'admin');
 
 -- ── content_views RLS ─────────────────────────────────────────
 
--- Admins can read all views
+drop policy if exists "views_select" on public.content_views;
 create policy "views_select" on public.content_views for select
   using (get_user_role() = 'admin');
 
--- Any authenticated user can record a view
+drop policy if exists "views_insert" on public.content_views;
 create policy "views_insert" on public.content_views for insert
   with check (auth.role() = 'authenticated');
 
 -- ── backup_logs RLS ───────────────────────────────────────────
 
--- Only admins can read backup logs
+drop policy if exists "backup_logs_select" on public.backup_logs;
 create policy "backup_logs_select" on public.backup_logs for select
   using (get_user_role() = 'admin');
 
--- Only service role (API) can insert/update backup logs
--- We use service_role key in API routes, which bypasses RLS
--- This policy exists as a fallback:
+drop policy if exists "backup_logs_insert" on public.backup_logs;
 create policy "backup_logs_insert" on public.backup_logs for insert
   with check (get_user_role() = 'admin');
 
+drop policy if exists "backup_logs_update" on public.backup_logs;
 create policy "backup_logs_update" on public.backup_logs for update
   using (get_user_role() = 'admin');
 
 -- ============================================================
 -- SEED: Default admin user setup note
 -- ============================================================
--- After running this migration, create your first user via
--- Supabase Auth (email magic link), then run:
+-- After running this migration, sign in via magic link, then run:
 --
 --   update public.users
 --   set role = 'admin'
 --   where id = 'your-user-uuid-here';
 --
--- See SETUP_GUIDE.md for full instructions.
+-- To find your UUID: select id, full_name from public.users;
 -- ============================================================
