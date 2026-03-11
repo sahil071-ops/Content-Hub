@@ -129,8 +129,16 @@ export function UploadForm({ productTags, topicTags, userRole, initialData }: Up
   function handleYoutubeData(data: any) {
     setYoutubeData(data);
     if (data) {
-      if (!watch('title') && data.title) setValue('title', data.title);
-      if (!watch('description') && data.description) setValue('description', data.description);
+      if (!watch('title') && data.title) setValue('title', data.title, { shouldValidate: true, shouldDirty: true });
+      if (!watch('description') && data.description) setValue('description', data.description, { shouldValidate: true, shouldDirty: true });
+    }
+  }
+
+  function handleBlogData(data: ArchivedBlogData | null) {
+    setBlogData(data);
+    if (data) {
+      if (!watch('title') && data.title) setValue('title', data.title, { shouldValidate: true, shouldDirty: true });
+      if (!watch('description') && data.description) setValue('description', data.description, { shouldValidate: true, shouldDirty: true });
     }
   }
 
@@ -343,7 +351,7 @@ export function UploadForm({ productTags, topicTags, userRole, initialData }: Up
                 <span className="bg-background px-2 text-muted-foreground">and / or</span>
               </div>
             </div>
-            <BlogUrlInput onData={setBlogData} data={blogData} />
+            <BlogUrlInput onData={handleBlogData} data={blogData} />
           </div>
         ) : (
           <UploadZone
