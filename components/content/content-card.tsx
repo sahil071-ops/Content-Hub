@@ -24,6 +24,10 @@ const CONTENT_ICONS = {
   blog: BookOpen,
   whitepaper: FileText,
   ebook: BookOpen,
+  poster: ImageIcon,
+  catalogue: BookOpen,
+  flier: FileText,
+  graphic: ImageIcon,
   other: FileQuestion,
 };
 
