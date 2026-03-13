@@ -41,36 +41,43 @@ export function formatDateTime(dateString: string | null): string {
 // ── Content type helpers ───────────────────────────────────────
 
 export const CONTENT_TYPE_LABELS: Record<ContentTypeEnum, string> = {
-  video: 'Video',
-  pdf: 'PDF',
-  image: 'Image',
-  presentation: 'Presentation',
-  emailer: 'Emailer',
   blog: 'Blog / Article',
-  whitepaper: 'Whitepaper',
-  ebook: 'eBook',
-  poster: 'Poster',
   catalogue: 'Catalogue',
+  ebook: 'eBook',
+  emailer: 'Emailer',
   flier: 'Flier',
   graphic: 'Graphic',
+  image: 'Photo',
   other: 'Other',
+  pdf: 'PDF',
+  poster: 'Poster',
+  presentation: 'Presentation',
+  video: 'YouTube',
+  video_file: 'Video File',
+  whitepaper: 'Whitepaper',
 };
 
 export const CONTENT_TYPE_COLORS: Record<ContentTypeEnum, string> = {
-  video: 'bg-red-100 text-red-700 border-red-200',
-  pdf: 'bg-orange-100 text-orange-700 border-orange-200',
-  image: 'bg-green-100 text-green-700 border-green-200',
-  presentation: 'bg-purple-100 text-purple-700 border-purple-200',
-  emailer: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   blog: 'bg-blue-100 text-blue-700 border-blue-200',
-  whitepaper: 'bg-indigo-100 text-indigo-700 border-indigo-200',
-  ebook: 'bg-pink-100 text-pink-700 border-pink-200',
-  poster: 'bg-teal-100 text-teal-700 border-teal-200',
   catalogue: 'bg-cyan-100 text-cyan-700 border-cyan-200',
+  ebook: 'bg-pink-100 text-pink-700 border-pink-200',
+  emailer: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   flier: 'bg-lime-100 text-lime-700 border-lime-200',
   graphic: 'bg-violet-100 text-violet-700 border-violet-200',
+  image: 'bg-green-100 text-green-700 border-green-200',
   other: 'bg-gray-100 text-gray-700 border-gray-200',
+  pdf: 'bg-orange-100 text-orange-700 border-orange-200',
+  poster: 'bg-teal-100 text-teal-700 border-teal-200',
+  presentation: 'bg-purple-100 text-purple-700 border-purple-200',
+  video: 'bg-red-100 text-red-700 border-red-200',
+  video_file: 'bg-rose-100 text-rose-700 border-rose-200',
+  whitepaper: 'bg-indigo-100 text-indigo-700 border-indigo-200',
 };
+
+// Sorted alphabetically by label for use in dropdowns and filters
+export const SORTED_CONTENT_TYPES = Object.keys(CONTENT_TYPE_LABELS).sort(
+  (a, b) => CONTENT_TYPE_LABELS[a as ContentTypeEnum].localeCompare(CONTENT_TYPE_LABELS[b as ContentTypeEnum])
+) as ContentTypeEnum[];
 
 export const AUDIENCE_LABELS: Record<AudienceTagEnum, string> = {
   internal: 'Internal',
@@ -124,13 +131,25 @@ export const ACCEPTED_FILE_TYPES: Record<string, string[]> = {
   'image/jpeg': ['.jpg', '.jpeg'],
   'image/png': ['.png'],
   'image/webp': ['.webp'],
+  'image/gif': ['.gif'],
+  'image/svg+xml': ['.svg'],
+  'image/tiff': ['.tif', '.tiff'],
   'image/vnd.adobe.photoshop': ['.psd'],
+  'video/mp4': ['.mp4'],
+  'video/quicktime': ['.mov'],
+  'video/x-msvideo': ['.avi'],
+  'video/x-matroska': ['.mkv'],
+  'video/webm': ['.webm'],
   'application/vnd.ms-powerpoint': ['.ppt'],
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
   'application/msword': ['.doc'],
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
   'text/html': ['.html'],
 };
+
+// Image MIME type prefixes for auto-detection
+export const IMAGE_MIME_TYPES = ['image/'];
+export const VIDEO_MIME_TYPES = ['video/'];
 
 export const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
 

@@ -11,8 +11,8 @@ function getB2Client(): S3Client {
     );
   }
 
-  // Extract region from endpoint (e.g. "s3.us-west-004.backblazeb2.com" → "us-west-004")
-  const regionMatch = endpoint.match(/s3\.([^.]+\.[^.]+)\./);
+  // Extract region from endpoint (e.g. "s3.eu-central-003.backblazeb2.com" → "eu-central-003")
+  const regionMatch = endpoint.match(/s3\.([^.]+)\./);
   const region = regionMatch ? regionMatch[1] : 'us-west-004';
 
   return new S3Client({

@@ -8,10 +8,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { CONTENT_TYPE_LABELS, AUDIENCE_LABELS } from '@/lib/utils';
+import { CONTENT_TYPE_LABELS, AUDIENCE_LABELS, SORTED_CONTENT_TYPES } from '@/lib/utils';
 import type { ContentTypeEnum, AudienceTagEnum, UserRoleEnum, TagRow } from '@/types/database';
 
-const CONTENT_TYPES = Object.keys(CONTENT_TYPE_LABELS) as ContentTypeEnum[];
+const CONTENT_TYPES = SORTED_CONTENT_TYPES;
 const AUDIENCE_TYPES = Object.keys(AUDIENCE_LABELS) as AudienceTagEnum[];
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft' },

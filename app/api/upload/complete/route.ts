@@ -29,7 +29,7 @@ export async function PATCH(request: NextRequest) {
 
     const {
       id, title, description, content_type, file_url, external_link,
-      thumbnail_url, product_tags, topic_tags, audience_tags,
+      thumbnail_url, product_tags, topic_tags, audience_tags, medium_tags,
       file_size_bytes, file_type_mime, meta, status = 'draft',
     } = body;
 
@@ -52,6 +52,7 @@ export async function PATCH(request: NextRequest) {
       product_tags: product_tags || [],
       topic_tags: topic_tags || [],
       audience_tags: (audience_tags || []) as unknown,
+      medium_tags: medium_tags || [],
       status,
       published_at: status === 'published' ? (existing?.published_at || now) : null,
     };
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     const {
       title, description, content_type, file_url, external_link,
-      thumbnail_url, product_tags, topic_tags, audience_tags,
+      thumbnail_url, product_tags, topic_tags, audience_tags, medium_tags,
       file_size_bytes, file_type_mime, meta, status = 'draft',
     } = body;
 
@@ -118,6 +119,7 @@ export async function POST(request: NextRequest) {
         product_tags: product_tags || [],
         topic_tags: topic_tags || [],
         audience_tags: (audience_tags || []) as any,
+        medium_tags: medium_tags || [],
         status,
         published_at: status === 'published' ? now : null,
         created_by: user.id,
