@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { ContentTypeEnum, AudienceTagEnum, ContentStatusEnum } from '@/types/database';
+import type { AudienceTagEnum, ContentStatusEnum } from '@/types/database';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -38,9 +38,9 @@ export function formatDateTime(dateString: string | null): string {
   }).format(new Date(dateString));
 }
 
-// ── Content type helpers ───────────────────────────────────────
+// ── Content type helpers (static fallbacks; dynamic types are in the content_types DB table) ──
 
-export const CONTENT_TYPE_LABELS: Record<ContentTypeEnum, string> = {
+export const CONTENT_TYPE_LABELS: Record<string, string> = {
   blog: 'Blog / Article',
   catalogue: 'Catalogue',
   ebook: 'eBook',
@@ -57,7 +57,7 @@ export const CONTENT_TYPE_LABELS: Record<ContentTypeEnum, string> = {
   whitepaper: 'Whitepaper',
 };
 
-export const CONTENT_TYPE_COLORS: Record<ContentTypeEnum, string> = {
+export const CONTENT_TYPE_COLORS: Record<string, string> = {
   blog: 'bg-blue-100 text-blue-700 border-blue-200',
   catalogue: 'bg-cyan-100 text-cyan-700 border-cyan-200',
   ebook: 'bg-pink-100 text-pink-700 border-pink-200',
@@ -74,10 +74,10 @@ export const CONTENT_TYPE_COLORS: Record<ContentTypeEnum, string> = {
   whitepaper: 'bg-indigo-100 text-indigo-700 border-indigo-200',
 };
 
-// Sorted alphabetically by label for use in dropdowns and filters
+// Sorted alphabetically by label for use in dropdowns and filters (static fallback)
 export const SORTED_CONTENT_TYPES = Object.keys(CONTENT_TYPE_LABELS).sort(
-  (a, b) => CONTENT_TYPE_LABELS[a as ContentTypeEnum].localeCompare(CONTENT_TYPE_LABELS[b as ContentTypeEnum])
-) as ContentTypeEnum[];
+  (a, b) => CONTENT_TYPE_LABELS[a].localeCompare(CONTENT_TYPE_LABELS[b])
+);
 
 export const AUDIENCE_LABELS: Record<AudienceTagEnum, string> = {
   internal: 'Internal',
@@ -95,7 +95,7 @@ export const STATUS_COLORS: Record<ContentStatusEnum, string> = {
 
 // ── R2 file path builder ───────────────────────────────────────
 
-export function buildFilePath(contentType: ContentTypeEnum, filename: string, uuid: string): string {
+export function buildFilePath(contentType: string, filename: string, uuid: string): string {
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');

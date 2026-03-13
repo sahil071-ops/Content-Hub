@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LayoutGrid, List, Upload } from 'lucide-react';
 import Link from 'next/link';
-import type { ContentItem, TagRow, UserRoleEnum } from '@/types/database';
+import type { ContentItem, TagRow, UserRoleEnum, ContentTypeRow } from '@/types/database';
+import type { ContentTypesMap } from '@/components/content/content-card';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = { title: 'Content Library' };
@@ -51,6 +52,18 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
 
   const productTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'product');
   const topicTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'topic');
+
+  // Fetch dynamic content types (may not exist before migration 004)
+  const { data: contentTypesData } = await supabase
+    .from('content_types')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order');
+  const contentTypes = (contentTypesData || []) as ContentTypeRow[];
+  // Build a lookup map for card badges
+  const contentTypesMap: ContentTypesMap = Object.fromEntries(
+    contentTypes.map((t) => [t.key, { label: t.label, color_classes: t.color_classes }])
+  );
 
   // Build content query
   let query = supabase
@@ -134,6 +147,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
             productTags={productTags}
             topicTags={topicTags}
             userRole={userRole}
+            contentTypes={contentTypes.length > 0 ? contentTypes : undefined}
           />
         </Suspense>
 
@@ -164,7 +178,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
               <p className="mt-1 text-xs opacity-80">{error.message}</p>
             </div>
           ) : (
-            <ContentGrid items={items || []} view={view} />
+            <ContentGrid items={items || []} view={view} contentTypesMap={contentTypesMap} />
           )}
         </div>
       </div>

@@ -52,11 +52,22 @@ export interface TagRow {
   created_at: string;
 }
 
+// Row type for the dynamic content_types registry (managed via admin UI after migration 004)
+export interface ContentTypeRow {
+  id: string;
+  key: string;
+  label: string;
+  color_classes: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface ContentItem {
   id: string;
   title: string;
   description: string | null;
-  content_type: ContentTypeEnum;
+  content_type: string; // text after migration 004 (was content_type_enum)
   file_url: string | null;
   backup_url: string | null;
   external_link: string | null;
@@ -132,13 +143,13 @@ export type ContentItemUpdate = Partial<
 
 export type TagInsert = Omit<TagRow, 'id' | 'created_at'>;
 
-// ── Public API response type (Phase 2 ready) ───────────────────
+// ── Public API response type ────────────────────────────────────
 
 export interface PublicContentItem {
   id: string;
   title: string;
   description: string | null;
-  content_type: ContentTypeEnum;
+  content_type: string;
   file_url: string | null;
   external_link: string | null;
   thumbnail_url: string | null;
@@ -153,7 +164,7 @@ export interface PublicContentItem {
 export interface PresignedUploadRequest {
   filename: string;
   content_type_mime: string;
-  content_type: ContentTypeEnum;
+  content_type: string;
 }
 
 export interface PresignedUploadResponse {
@@ -165,7 +176,7 @@ export interface PresignedUploadResponse {
 export interface UploadCompleteRequest {
   title: string;
   description?: string;
-  content_type: ContentTypeEnum;
+  content_type: string;
   file_path?: string;
   file_url?: string;
   external_link?: string;
@@ -214,16 +225,20 @@ export interface Database {
         Update: Partial<Pick<BackupLog, 'status' | 'b2_url' | 'error_message'>>;
         Relationships: [];
       };
+      content_types: {
+        Row: ContentTypeRow;
+        Insert: Omit<ContentTypeRow, 'id' | 'created_at'>;
+        Update: Partial<Omit<ContentTypeRow, 'id' | 'created_at'>>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
     Enums: {
-      content_type_enum: ContentTypeEnum;
       audience_tag_enum: AudienceTagEnum;
       content_status_enum: ContentStatusEnum;
       user_role_enum: UserRoleEnum;
       tag_type_enum: TagTypeEnum;
-      medium_tag_enum: string;
       backup_status_enum: BackupStatusEnum;
     };
     CompositeTypes: Record<string, never>;

@@ -8,13 +8,16 @@ import {
   Tags,
   Users,
   HardDrive,
-  LayoutGrid,
   ChevronRight,
   Building2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  LayoutGrid,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { UserRoleEnum } from '@/types/database';
 
 interface NavItem {
@@ -44,7 +47,13 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
     label: 'Tag Management',
     href: '/admin/tags',
     icon: Tags,
-    roles: ['admin'],
+    roles: ['admin', 'marketing'],
+  },
+  {
+    label: 'Content Types',
+    href: '/admin/content-types',
+    icon: LayoutGrid,
+    roles: ['admin', 'marketing'],
   },
   {
     label: 'User Management',
@@ -63,86 +72,127 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
 interface AppSidebarProps {
   userRole: UserRoleEnum;
   onNavigate?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function AppSidebar({ userRole, onNavigate }: AppSidebarProps) {
+export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCollapse }: AppSidebarProps) {
   const pathname = usePathname();
 
   const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleAdmin = ADMIN_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
 
-  return (
-    <div className="flex h-full flex-col bg-[#1a1a2e] text-white">
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-2 px-6 border-b border-white/10">
-        <div className="flex h-8 w-8 items-center justify-center rounded bg-[#2323A3]">
-          <Building2 className="h-5 w-5 text-white" />
-        </div>
-        <div>
-          <div className="font-bold text-sm leading-tight">Axis</div>
-          <div className="text-xs text-white/50 leading-tight">Content Hub</div>
-        </div>
-      </div>
-
-      <ScrollArea className="flex-1 px-3 py-4">
-        {/* Main navigation */}
-        <nav className="space-y-1">
-          {visibleNav.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onNavigate}
-                className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-[#2323A3] text-white'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
-                )}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {item.label}
-                {isActive && <ChevronRight className="ml-auto h-3 w-3 opacity-60" />}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Admin section */}
-        {visibleAdmin.length > 0 && (
+  function NavLink({ item }: { item: NavItem }) {
+    const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+    const link = (
+      <Link
+        href={item.href}
+        onClick={onNavigate}
+        className={cn(
+          'flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors',
+          collapsed ? 'justify-center' : 'gap-3',
+          isActive
+            ? 'bg-[#2323A3] text-white'
+            : 'text-white/70 hover:bg-white/10 hover:text-white'
+        )}
+      >
+        <item.icon className="h-4 w-4 shrink-0" />
+        {!collapsed && (
           <>
-            <Separator className="my-4 bg-white/10" />
-            <div className="px-3 mb-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-white/30">
-                Administration
-              </span>
-            </div>
-            <nav className="space-y-1">
-              {visibleAdmin.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={onNavigate}
-                    className={cn(
-                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-[#2323A3] text-white'
-                        : 'text-white/70 hover:bg-white/10 hover:text-white'
-                    )}
-                  >
-                    <item.icon className="h-4 w-4 shrink-0" />
-                    {item.label}
-                    {isActive && <ChevronRight className="ml-auto h-3 w-3 opacity-60" />}
-                  </Link>
-                );
-              })}
-            </nav>
+            {item.label}
+            {isActive && <ChevronRight className="ml-auto h-3 w-3 opacity-60" />}
           </>
         )}
-      </ScrollArea>
-    </div>
+      </Link>
+    );
+
+    if (collapsed) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>{link}</TooltipTrigger>
+          <TooltipContent side="right">{item.label}</TooltipContent>
+        </Tooltip>
+      );
+    }
+    return link;
+  }
+
+  return (
+    <TooltipProvider delayDuration={0}>
+      <div className="flex h-full flex-col bg-[#1a1a2e] text-white">
+        {/* Logo */}
+        <div className={cn(
+          'flex h-16 items-center border-b border-white/10 shrink-0',
+          collapsed ? 'justify-center px-2' : 'gap-2 px-6'
+        )}>
+          <div className="flex h-8 w-8 items-center justify-center rounded bg-[#2323A3] shrink-0">
+            <Building2 className="h-5 w-5 text-white" />
+          </div>
+          {!collapsed && (
+            <div>
+              <div className="font-bold text-sm leading-tight">Axis</div>
+              <div className="text-xs text-white/50 leading-tight">Content Hub</div>
+            </div>
+          )}
+        </div>
+
+        <ScrollArea className="flex-1 px-2 py-4">
+          {/* Main navigation */}
+          <nav className="space-y-1">
+            {visibleNav.map((item) => (
+              <NavLink key={item.href} item={item} />
+            ))}
+          </nav>
+
+          {/* Admin section */}
+          {visibleAdmin.length > 0 && (
+            <>
+              <Separator className="my-4 bg-white/10" />
+              {!collapsed && (
+                <div className="px-3 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-white/30">
+                    Administration
+                  </span>
+                </div>
+              )}
+              <nav className="space-y-1">
+                {visibleAdmin.map((item) => (
+                  <NavLink key={item.href} item={item} />
+                ))}
+              </nav>
+            </>
+          )}
+        </ScrollArea>
+
+        {/* Desktop collapse toggle — only shown when onToggleCollapse is provided */}
+        {onToggleCollapse && (
+          <div className="shrink-0 border-t border-white/10 p-2">
+            {collapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onToggleCollapse}
+                    className="flex w-full items-center justify-center rounded-md px-3 py-2 text-white/50 hover:bg-white/10 hover:text-white transition-colors"
+                    aria-label="Expand sidebar"
+                  >
+                    <PanelLeftOpen className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Expand sidebar</TooltipContent>
+              </Tooltip>
+            ) : (
+              <button
+                onClick={onToggleCollapse}
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-white/50 hover:bg-white/10 hover:text-white transition-colors text-xs"
+                aria-label="Collapse sidebar"
+              >
+                <PanelLeftClose className="h-4 w-4 shrink-0" />
+                Collapse
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
