@@ -1,4 +1,4 @@
-import { ContentCard } from '@/components/content/content-card';
+import { ContentCard, type ContentTypesMap } from '@/components/content/content-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FileSearch } from 'lucide-react';
 import type { ContentItem } from '@/types/database';
@@ -7,9 +7,10 @@ interface ContentGridProps {
   items: ContentItem[];
   view?: 'grid' | 'list';
   loading?: boolean;
+  contentTypesMap?: ContentTypesMap;
 }
 
-export function ContentGrid({ items, view = 'grid', loading }: ContentGridProps) {
+export function ContentGrid({ items, view = 'grid', loading, contentTypesMap }: ContentGridProps) {
   if (loading) {
     return (
       <div className={view === 'grid'
@@ -41,7 +42,7 @@ export function ContentGrid({ items, view = 'grid', loading }: ContentGridProps)
       : 'space-y-2'
     }>
       {items.map((item) => (
-        <ContentCard key={item.id} item={item} view={view} />
+        <ContentCard key={item.id} item={item} view={view} contentTypesMap={contentTypesMap} />
       ))}
     </div>
   );

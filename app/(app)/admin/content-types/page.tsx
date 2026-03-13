@@ -1,12 +1,13 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { TagsManager } from '@/components/admin/tags-manager';
+import { ContentTypesManager } from '@/components/admin/content-types-manager';
+import type { ContentTypeRow } from '@/types/database';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = { title: 'Tag Management' };
+export const metadata: Metadata = { title: 'Content Types' };
 export const dynamic = 'force-dynamic';
 
-export default async function TagsPage() {
+export default async function ContentTypesPage() {
   const supabase = createClient();
 
   const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -20,15 +21,14 @@ export default async function TagsPage() {
     redirect('/library');
   }
 
-  const { data: tags } = await supabase
-    .from('tags_master')
+  const { data } = await supabase
+    .from('content_types')
     .select('*')
-    .order('tag_type')
-    .order('name');
+    .order('sort_order');
 
   return (
-    <div className="p-6">
-      <TagsManager initialTags={tags || []} />
+    <div className="p-6 max-w-4xl mx-auto">
+      <ContentTypesManager initialTypes={(data || []) as ContentTypeRow[]} />
     </div>
   );
 }

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { UploadForm } from '@/components/upload/upload-form';
-import type { ContentItem, TagRow, UserRoleEnum } from '@/types/database';
+import type { ContentItem, TagRow, UserRoleEnum, ContentTypeRow } from '@/types/database';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
@@ -39,6 +39,14 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
   const productTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'product');
   const topicTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'topic');
   const mediumTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'medium');
+
+  // Fetch dynamic content types (gracefully handles pre-migration 004 state)
+  const { data: contentTypesData } = await supabase
+    .from('content_types')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order');
+  const contentTypes = (contentTypesData || []) as ContentTypeRow[];
 
   // Load existing item if editing
   let editItem: ContentItem | null = null;
@@ -97,6 +105,7 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
           mediumTags={mediumTags}
           userRole={userRole as 'admin' | 'marketing'}
           initialData={editItem}
+          contentTypes={contentTypes.length > 0 ? contentTypes : undefined}
         />
       </div>
     </div>

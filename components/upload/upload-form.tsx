@@ -24,9 +24,8 @@ import { generatePdfThumbnail } from '@/components/content/pdf-viewer';
 import { createClient } from '@/lib/supabase/client';
 
 import { CONTENT_TYPE_LABELS, AUDIENCE_LABELS, SORTED_CONTENT_TYPES } from '@/lib/utils';
-import type { ContentTypeEnum, AudienceTagEnum, TagRow, ContentItem } from '@/types/database';
+import type { AudienceTagEnum, TagRow, ContentItem, ContentTypeRow } from '@/types/database';
 
-const CONTENT_TYPES = SORTED_CONTENT_TYPES;
 const AUDIENCE_TYPES = Object.keys(AUDIENCE_LABELS) as AudienceTagEnum[];
 
 const TAG_PRESET_COLORS = [
@@ -37,7 +36,7 @@ const TAG_PRESET_COLORS = [
 const schema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
   description: z.string().optional(),
-  content_type: z.enum(CONTENT_TYPES as [ContentTypeEnum, ...ContentTypeEnum[]]),
+  content_type: z.string().min(1, 'Content type is required'),
   status: z.enum(['draft', 'published']),
   product_tags: z.array(z.string()).default([]),
   topic_tags: z.array(z.string()).default([]),
@@ -53,9 +52,14 @@ interface UploadFormProps {
   mediumTags: TagRow[];
   userRole: 'admin' | 'marketing';
   initialData?: ContentItem | null;
+  contentTypes?: ContentTypeRow[];
 }
 
-export function UploadForm({ productTags, topicTags, mediumTags, userRole, initialData }: UploadFormProps) {
+export function UploadForm({ productTags, topicTags, mediumTags, userRole, initialData, contentTypes }: UploadFormProps) {
+  // Build the list of content types to display — dynamic from DB or static fallback
+  const contentTypeList = contentTypes && contentTypes.length > 0
+    ? contentTypes.filter((t) => t.is_active).sort((a, b) => a.sort_order - b.sort_order)
+    : SORTED_CONTENT_TYPES.map((k) => ({ key: k, label: CONTENT_TYPE_LABELS[k] ?? k }));
   const router = useRouter();
   const isEdit = !!initialData;
 
@@ -79,6 +83,8 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Track whether user has manually picked a content type (prevents auto-detect from overriding it)
+  const [typeManuallySet, setTypeManuallySet] = useState(!!initialData?.content_type);
 
   // ── Tag states ─────────────────────────────────────────────────
   const [allProductTags, setAllProductTags] = useState<TagRow[]>(productTags);
@@ -117,20 +123,25 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
 
   async function handleFileAccepted(f: File) {
     setFile(f);
-    // Auto-detect content type from MIME type
-    if (f.type.startsWith('image/')) {
-      setValue('content_type', 'image');
-    } else if (f.type.startsWith('video/')) {
-      setValue('content_type', 'video_file');
-    } else if (f.type === 'application/pdf') {
-      setValue('content_type', 'pdf');
+    // Auto-detect content type from MIME only when user hasn't explicitly chosen one
+    if (!typeManuallySet) {
+      if (f.type.startsWith('image/')) {
+        setValue('content_type', 'image');
+      } else if (f.type.startsWith('video/')) {
+        setValue('content_type', 'video_file');
+      } else if (f.type === 'application/pdf') {
+        setValue('content_type', 'pdf');
+      } else if (
+        f.type === 'application/vnd.ms-powerpoint' ||
+        f.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      ) {
+        setValue('content_type', 'presentation');
+      }
+    }
+    // Always generate PDF thumbnail regardless of whether type was manually set
+    if (f.type === 'application/pdf') {
       const thumb = await generatePdfThumbnail(f);
       if (thumb) setThumbnailDataUrl(thumb);
-    } else if (
-      f.type === 'application/vnd.ms-powerpoint' ||
-      f.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-    ) {
-      setValue('content_type', 'presentation');
     }
   }
 
@@ -278,7 +289,9 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
       });
       const completeJson = await completeRes.json();
       if (!completeRes.ok) {
-        setSubmitError(completeJson.error || 'Failed to save content.');
+        const errMsg = completeJson.error || 'Failed to save content.';
+        const errDetail = completeJson.detail ? `\n\nDetail: ${completeJson.detail}` : '';
+        setSubmitError(errMsg + errDetail);
         return;
       }
 
@@ -325,7 +338,8 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
           <Select
             value={contentType}
             onValueChange={(val) => {
-              setValue('content_type', val as ContentTypeEnum);
+              setTypeManuallySet(true);
+              setValue('content_type', val);
               setFile(null);
               setYoutubeData(null);
               setBlogData(null);
@@ -335,8 +349,8 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {CONTENT_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>{CONTENT_TYPE_LABELS[t]}</SelectItem>
+              {contentTypeList.map((t) => (
+                <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>

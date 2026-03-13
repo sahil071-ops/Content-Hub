@@ -6,12 +6,10 @@ import { X, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CONTENT_TYPE_LABELS, AUDIENCE_LABELS, SORTED_CONTENT_TYPES } from '@/lib/utils';
-import type { ContentTypeEnum, AudienceTagEnum, UserRoleEnum, TagRow } from '@/types/database';
+import type { AudienceTagEnum, UserRoleEnum, TagRow, ContentTypeRow } from '@/types/database';
 
-const CONTENT_TYPES = SORTED_CONTENT_TYPES;
 const AUDIENCE_TYPES = Object.keys(AUDIENCE_LABELS) as AudienceTagEnum[];
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Draft' },
@@ -23,12 +21,19 @@ interface ContentFiltersProps {
   productTags: TagRow[];
   topicTags: TagRow[];
   userRole: UserRoleEnum;
+  contentTypes?: ContentTypeRow[];
 }
 
-export function ContentFilters({ productTags, topicTags, userRole }: ContentFiltersProps) {
+export function ContentFilters({ productTags, topicTags, userRole, contentTypes }: ContentFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // Use dynamic content types from DB if available, fall back to static list
+  const typeList: Array<{ key: string; label: string }> = contentTypes && contentTypes.length > 0
+    ? contentTypes.filter((t) => t.is_active).sort((a, b) => a.sort_order - b.sort_order)
+        .map((t) => ({ key: t.key, label: t.label }))
+    : SORTED_CONTENT_TYPES.map((k) => ({ key: k, label: CONTENT_TYPE_LABELS[k] ?? k }));
 
   const updateFilter = useCallback((key: string, value: string, checked: boolean) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -44,7 +49,6 @@ export function ContentFilters({ productTags, topicTags, userRole }: ContentFilt
       updated.forEach((v) => params.append(key, v));
     }
 
-    // Reset page on filter change
     params.delete('page');
     router.push(`${pathname}?${params.toString()}`);
   }, [searchParams, router, pathname]);
@@ -87,13 +91,13 @@ export function ContentFilters({ productTags, topicTags, userRole }: ContentFilt
           <div className="space-y-5 pr-2">
             {/* Content Type */}
             <FilterSection title="Content Type">
-              {CONTENT_TYPES.map((type) => (
+              {typeList.map(({ key, label }) => (
                 <FilterCheckbox
-                  key={type}
-                  id={`type-${type}`}
-                  label={CONTENT_TYPE_LABELS[type]}
-                  checked={isChecked('type', type)}
-                  onChange={(checked) => updateFilter('type', type, checked)}
+                  key={key}
+                  id={`type-${key}`}
+                  label={label}
+                  checked={isChecked('type', key)}
+                  onChange={(checked) => updateFilter('type', key, checked)}
                 />
               ))}
             </FilterSection>

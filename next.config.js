@@ -4,6 +4,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || '',
     NEXT_PUBLIC_BUILD_DATE: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+    NEXT_PUBLIC_BUILD_TIME: new Date().toISOString().slice(11, 16), // HH:MM UTC
   },
 
   // Unique build ID per deployment — invalidates old service workers

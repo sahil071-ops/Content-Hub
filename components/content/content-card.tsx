@@ -12,9 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { cn, formatDate, getShareableLink } from '@/lib/utils';
-import type { ContentItem } from '@/types/database';
+import type { ContentItem, ContentTypeRow } from '@/types/database';
 
-const CONTENT_ICONS = {
+const CONTENT_ICONS: Record<string, React.ElementType> = {
   video: Film,
   video_file: Film,
   pdf: FileText,
@@ -31,17 +31,21 @@ const CONTENT_ICONS = {
   other: FileQuestion,
 };
 
-// Content types that use the file_url as their visual preview
+// Content types that use the file_url as a visual preview image
 const IMAGE_CONTENT_TYPES = new Set(['image', 'poster', 'graphic', 'flier']);
+
+export type ContentTypesMap = Record<string, Pick<ContentTypeRow, 'label' | 'color_classes'>>;
 
 interface ContentCardProps {
   item: ContentItem;
   view?: 'grid' | 'list';
+  contentTypesMap?: ContentTypesMap;
 }
 
-export function ContentCard({ item, view = 'grid' }: ContentCardProps) {
+export function ContentCard({ item, view = 'grid', contentTypesMap }: ContentCardProps) {
   const [copied, setCopied] = useState(false);
-  const Icon = CONTENT_ICONS[item.content_type];
+  const Icon = CONTENT_ICONS[item.content_type] ?? FileQuestion;
+  const ctData = contentTypesMap?.[item.content_type];
 
   async function handleCopyLink(e: React.MouseEvent) {
     e.preventDefault();
@@ -74,7 +78,11 @@ export function ContentCard({ item, view = 'grid' }: ContentCardProps) {
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <ContentTypeBadge contentType={item.content_type} />
+              <ContentTypeBadge
+                contentType={item.content_type}
+                label={ctData?.label}
+                colorClasses={ctData?.color_classes}
+              />
               {item.product_tags.slice(0, 2).map((tag) => (
                 <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
               ))}
@@ -149,7 +157,11 @@ export function ContentCard({ item, view = 'grid' }: ContentCardProps) {
 
           {/* Content type badge overlay */}
           <div className="absolute bottom-2 left-2">
-            <ContentTypeBadge contentType={item.content_type} />
+            <ContentTypeBadge
+              contentType={item.content_type}
+              label={ctData?.label}
+              colorClasses={ctData?.color_classes}
+            />
           </div>
         </div>
 
