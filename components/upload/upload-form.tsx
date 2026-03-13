@@ -23,10 +23,10 @@ import { BlogUrlInput, type ArchivedBlogData } from '@/components/upload/blog-ur
 import { generatePdfThumbnail } from '@/components/content/pdf-viewer';
 import { createClient } from '@/lib/supabase/client';
 
-import { CONTENT_TYPE_LABELS, AUDIENCE_LABELS } from '@/lib/utils';
+import { CONTENT_TYPE_LABELS, AUDIENCE_LABELS, SORTED_CONTENT_TYPES } from '@/lib/utils';
 import type { ContentTypeEnum, AudienceTagEnum, TagRow, ContentItem } from '@/types/database';
 
-const CONTENT_TYPES = Object.keys(CONTENT_TYPE_LABELS) as ContentTypeEnum[];
+const CONTENT_TYPES = SORTED_CONTENT_TYPES;
 const AUDIENCE_TYPES = Object.keys(AUDIENCE_LABELS) as AudienceTagEnum[];
 
 const TAG_PRESET_COLORS = [
@@ -42,6 +42,7 @@ const schema = z.object({
   product_tags: z.array(z.string()).default([]),
   topic_tags: z.array(z.string()).default([]),
   audience_tags: z.array(z.string()).default([]),
+  medium_tags: z.array(z.string()).default([]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -49,11 +50,12 @@ type FormValues = z.infer<typeof schema>;
 interface UploadFormProps {
   productTags: TagRow[];
   topicTags: TagRow[];
+  mediumTags: TagRow[];
   userRole: 'admin' | 'marketing';
   initialData?: ContentItem | null;
 }
 
-export function UploadForm({ productTags, topicTags, userRole, initialData }: UploadFormProps) {
+export function UploadForm({ productTags, topicTags, mediumTags, userRole, initialData }: UploadFormProps) {
   const router = useRouter();
   const isEdit = !!initialData;
 
@@ -81,7 +83,8 @@ export function UploadForm({ productTags, topicTags, userRole, initialData }: Up
   // ── Tag states ─────────────────────────────────────────────────
   const [allProductTags, setAllProductTags] = useState<TagRow[]>(productTags);
   const [allTopicTags, setAllTopicTags] = useState<TagRow[]>(topicTags);
-  const [newTagInput, setNewTagInput] = useState<{ type: 'product' | 'topic'; name: string; color: string } | null>(null);
+  const [allMediumTags, setAllMediumTags] = useState<TagRow[]>(mediumTags);
+  const [newTagInput, setNewTagInput] = useState<{ type: 'product' | 'topic' | 'medium'; name: string; color: string } | null>(null);
   const [tagCreating, setTagCreating] = useState(false);
 
   // ── Form ───────────────────────────────────────────────────────
@@ -101,24 +104,37 @@ export function UploadForm({ productTags, topicTags, userRole, initialData }: Up
       product_tags: initialData?.product_tags || [],
       topic_tags: initialData?.topic_tags || [],
       audience_tags: (initialData?.audience_tags || []) as string[],
+      medium_tags: (initialData as any)?.medium_tags || [],
     },
   });
 
   const contentType = watch('content_type');
-  const isVideo = contentType === 'video';
+  const isYouTube = contentType === 'video';
+  const isVideo = isYouTube;
   const isBlog = contentType === 'blog';
 
   // ── Handlers ───────────────────────────────────────────────────
 
   async function handleFileAccepted(f: File) {
     setFile(f);
-    if (f.type === 'application/pdf') {
+    // Auto-detect content type from MIME type
+    if (f.type.startsWith('image/')) {
+      setValue('content_type', 'image');
+    } else if (f.type.startsWith('video/')) {
+      setValue('content_type', 'video_file');
+    } else if (f.type === 'application/pdf') {
+      setValue('content_type', 'pdf');
       const thumb = await generatePdfThumbnail(f);
       if (thumb) setThumbnailDataUrl(thumb);
+    } else if (
+      f.type === 'application/vnd.ms-powerpoint' ||
+      f.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    ) {
+      setValue('content_type', 'presentation');
     }
   }
 
-  function toggleArrayValue(field: 'product_tags' | 'topic_tags' | 'audience_tags', value: string) {
+  function toggleArrayValue(field: 'product_tags' | 'topic_tags' | 'audience_tags' | 'medium_tags', value: string) {
     const current = watch(field) as string[];
     const updated = current.includes(value)
       ? current.filter((v) => v !== value)
@@ -157,6 +173,9 @@ export function UploadForm({ productTags, topicTags, userRole, initialData }: Up
         if (newTagInput.type === 'product') {
           setAllProductTags(prev => [...prev, data as TagRow].sort((a, b) => a.name.localeCompare(b.name)));
           toggleArrayValue('product_tags', data.name);
+        } else if (newTagInput.type === 'medium') {
+          setAllMediumTags(prev => [...prev, data as TagRow].sort((a, b) => a.name.localeCompare(b.name)));
+          toggleArrayValue('medium_tags', data.name);
         } else {
           setAllTopicTags(prev => [...prev, data as TagRow].sort((a, b) => a.name.localeCompare(b.name)));
           toggleArrayValue('topic_tags', data.name);
@@ -177,7 +196,11 @@ export function UploadForm({ productTags, topicTags, userRole, initialData }: Up
 
     try {
       let fileUrl: string | undefined = existingFileUrl || undefined;
-      let thumbnailUrl: string | undefined = existingThumbnailUrl || youtubeData?.thumbnail_url || undefined;
+      let thumbnailUrl: string | undefined =
+        existingThumbnailUrl ||
+        youtubeData?.thumbnail_url ||
+        (blogData?.og_image ? blogData.og_image : undefined) ||
+        undefined;
 
       // ── Upload new file to R2 (only if a new file was selected) ──
       if (file) {
@@ -244,6 +267,7 @@ export function UploadForm({ productTags, topicTags, userRole, initialData }: Up
         thumbnail_url: thumbnailUrl,
         file_size_bytes: file?.size ?? (isEdit ? initialData?.file_size_bytes ?? undefined : undefined),
         file_type_mime: file?.type ?? (isEdit ? initialData?.file_type ?? undefined : undefined),
+        medium_tags: values.medium_tags,
         meta,
       };
 
@@ -324,7 +348,7 @@ export function UploadForm({ productTags, topicTags, userRole, initialData }: Up
       {/* ── File / URL Input ─────────────────────────────────── */}
       <section className="space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          {isVideo ? 'Video Link' : isBlog ? 'File or Blog URL' : 'File'}
+          {isYouTube ? 'YouTube Link' : isBlog ? 'File or Blog URL' : 'File'}
         </h2>
 
         {isEdit && existingFileUrl && !file && !isVideo && !isBlog && (
@@ -334,7 +358,7 @@ export function UploadForm({ productTags, topicTags, userRole, initialData }: Up
           </div>
         )}
 
-        {isVideo ? (
+        {isYouTube ? (
           <YouTubeInput onData={handleYoutubeData} data={youtubeData} />
         ) : isBlog ? (
           <div className="space-y-4">
@@ -504,6 +528,57 @@ export function UploadForm({ productTags, topicTags, userRole, initialData }: Up
             })}
             {allTopicTags.length === 0 && newTagInput?.type !== 'topic' && (
               <p className="text-xs text-muted-foreground">No topic tags yet. Click &quot;New tag&quot; to add one.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Medium Tags */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Platform / Medium</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => setNewTagInput({ type: 'medium', name: '', color: TAG_PRESET_COLORS[2] })}
+            >
+              <Plus className="h-3 w-3" /> New tag
+            </Button>
+          </div>
+
+          {newTagInput?.type === 'medium' && (
+            <InlineTagForm
+              value={newTagInput}
+              onChange={(v) => setNewTagInput(prev => prev ? { ...prev, ...v } : null)}
+              onSubmit={createTag}
+              onCancel={() => setNewTagInput(null)}
+              loading={tagCreating}
+            />
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {allMediumTags.map((tag) => {
+              const checked = (watch('medium_tags') as string[]).includes(tag.name);
+              return (
+                <label
+                  key={tag.id}
+                  className={`flex items-center gap-1.5 cursor-pointer rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                    checked ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggleArrayValue('medium_tags', tag.name)}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                  {tag.name}
+                </label>
+              );
+            })}
+            {allMediumTags.length === 0 && newTagInput?.type !== 'medium' && (
+              <p className="text-xs text-muted-foreground">No platform tags yet. Click &quot;New tag&quot; to add one (e.g. Instagram, LinkedIn, Email).</p>
             )}
           </div>
         </div>

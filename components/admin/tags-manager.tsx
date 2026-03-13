@@ -19,6 +19,7 @@ import type { TagRow, TagTypeEnum } from '@/types/database';
 const TAG_TYPE_LABELS: Record<TagTypeEnum, string> = {
   product: 'Product',
   topic: 'Topic',
+  medium: 'Platform / Medium',
   audience: 'Audience',
   content_type: 'Content Type',
 };

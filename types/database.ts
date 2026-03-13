@@ -5,6 +5,7 @@
 
 export type ContentTypeEnum =
   | 'video'
+  | 'video_file'
   | 'pdf'
   | 'image'
   | 'presentation'
@@ -29,7 +30,7 @@ export type ContentStatusEnum = 'draft' | 'published' | 'archived';
 
 export type UserRoleEnum = 'admin' | 'marketing' | 'sales' | 'distributor' | 'viewer';
 
-export type TagTypeEnum = 'product' | 'topic' | 'audience' | 'content_type';
+export type TagTypeEnum = 'product' | 'topic' | 'audience' | 'content_type' | 'medium';
 
 export type BackupStatusEnum = 'success' | 'failed' | 'pending';
 
@@ -63,6 +64,7 @@ export interface ContentItem {
   product_tags: string[];
   topic_tags: string[];
   audience_tags: AudienceTagEnum[];
+  medium_tags: string[];
   status: ContentStatusEnum;
   created_by: string | null;
   created_at: string;
@@ -171,6 +173,7 @@ export interface UploadCompleteRequest {
   product_tags?: string[];
   topic_tags?: string[];
   audience_tags?: AudienceTagEnum[];
+  medium_tags?: string[];
   file_size_bytes?: number;
   file_type_mime?: string;
   meta?: ContentMeta;
@@ -220,6 +223,7 @@ export interface Database {
       content_status_enum: ContentStatusEnum;
       user_role_enum: UserRoleEnum;
       tag_type_enum: TagTypeEnum;
+      medium_tag_enum: string;
       backup_status_enum: BackupStatusEnum;
     };
     CompositeTypes: Record<string, never>;

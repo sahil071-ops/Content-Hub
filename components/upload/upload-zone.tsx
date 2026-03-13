@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { UploadCloud, File as FileIcon, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,18 @@ interface UploadZoneProps {
 }
 
 export function UploadZone({ onFileAccepted, file, onClear, uploadProgress, disabled }: UploadZoneProps) {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (file && file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [file]);
+
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
       onFileAccepted(acceptedFiles[0]);
@@ -32,8 +44,16 @@ export function UploadZone({ onFileAccepted, file, onClear, uploadProgress, disa
 
   if (file) {
     return (
-      <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-4">
-        <div className="flex items-center gap-3">
+      <div className="rounded-lg border-2 border-primary/20 bg-primary/5 overflow-hidden">
+        {previewUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={previewUrl}
+            alt="Preview"
+            className="w-full max-h-64 object-contain bg-black/5"
+          />
+        )}
+        <div className="flex items-center gap-3 p-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
             <FileIcon className="h-5 w-5 text-primary" />
           </div>
@@ -85,7 +105,7 @@ export function UploadZone({ onFileAccepted, file, onClear, uploadProgress, disa
               Drag & drop a file here, or <span className="text-primary">browse</span>
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              PDF, JPG, PNG, PSD, PPT, PPTX, DOC, DOCX, HTML · Max 500 MB
+              PDF, JPG, PNG, GIF, SVG, PSD, MP4, MOV, PPT, PPTX, DOC, DOCX, HTML · Max 500 MB
             </p>
           </>
         )}

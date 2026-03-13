@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { UploadForm } from '@/components/upload/upload-form';
@@ -37,6 +38,7 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
 
   const productTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'product');
   const topicTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'topic');
+  const mediumTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'medium');
 
   // Load existing item if editing
   let editItem: ContentItem | null = null;
@@ -54,18 +56,31 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">{isEdit ? 'Edit Content' : 'Upload Content'}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {isEdit
-            ? 'Update the details for this content item.'
-            : 'Add files, videos, or blog posts to the content library.'}
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">{isEdit ? 'Edit Content' : 'Upload Content'}</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {isEdit
+                ? 'Update the details for this content item.'
+                : 'Add files, videos, or blog posts to the content library.'}
+            </p>
+          </div>
+          {!isEdit && (
+            <Link
+              href="/upload/batch"
+              className="shrink-0 inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+            >
+              Batch Upload
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="rounded-lg border bg-card p-6">
         <UploadForm
           productTags={productTags}
           topicTags={topicTags}
+          mediumTags={mediumTags}
           userRole={userRole as 'admin' | 'marketing'}
           initialData={editItem}
         />

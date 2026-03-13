@@ -1,10 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   FileText, Film, Image as ImageIcon, Presentation, Mail, BookOpen,
-  FileQuestion, Link as LinkIcon, Copy, Check, ExternalLink,
+  FileQuestion, Copy, Check, ExternalLink,
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +16,7 @@ import type { ContentItem } from '@/types/database';
 
 const CONTENT_ICONS = {
   video: Film,
+  video_file: Film,
   pdf: FileText,
   image: ImageIcon,
   presentation: Presentation,
@@ -30,6 +30,9 @@ const CONTENT_ICONS = {
   graphic: ImageIcon,
   other: FileQuestion,
 };
+
+// Content types that use the file_url as their visual preview
+const IMAGE_CONTENT_TYPES = new Set(['image', 'poster', 'graphic', 'flier']);
 
 interface ContentCardProps {
   item: ContentItem;
@@ -56,8 +59,13 @@ export function ContentCard({ item, view = 'grid' }: ContentCardProps) {
         <div className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors rounded-lg border bg-card">
           {/* Thumbnail or icon */}
           <div className="shrink-0 w-14 h-14 rounded-md overflow-hidden bg-muted flex items-center justify-center">
-            {item.thumbnail_url ? (
-              <Image src={item.thumbnail_url} alt={item.title} width={56} height={56} className="object-cover w-full h-full" />
+            {(item.thumbnail_url || (IMAGE_CONTENT_TYPES.has(item.content_type) && item.file_url)) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={item.thumbnail_url || item.file_url!}
+                alt={item.title}
+                className="object-cover w-full h-full"
+              />
             ) : (
               <Icon className="h-6 w-6 text-muted-foreground" />
             )}
@@ -107,12 +115,12 @@ export function ContentCard({ item, view = 'grid' }: ContentCardProps) {
       <div className="rounded-lg border bg-card overflow-hidden hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
         {/* Thumbnail */}
         <div className="relative aspect-[16/9] bg-muted flex items-center justify-center overflow-hidden">
-          {item.thumbnail_url ? (
-            <Image
-              src={item.thumbnail_url}
+          {(item.thumbnail_url || (IMAGE_CONTENT_TYPES.has(item.content_type) && item.file_url)) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.thumbnail_url || item.file_url!}
               alt={item.title}
-              fill
-              className="object-cover group-hover:scale-[1.02] transition-transform duration-300"
+              className="object-cover w-full h-full group-hover:scale-[1.02] transition-transform duration-300"
             />
           ) : (
             <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
@@ -122,7 +130,7 @@ export function ContentCard({ item, view = 'grid' }: ContentCardProps) {
           )}
 
           {/* Video play overlay */}
-          {item.content_type === 'video' && item.thumbnail_url && (
+          {(item.content_type === 'video' || item.content_type === 'video_file') && item.thumbnail_url && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="h-10 w-10 rounded-full bg-black/50 flex items-center justify-center">
                 <Film className="h-5 w-5 text-white ml-0.5" />
