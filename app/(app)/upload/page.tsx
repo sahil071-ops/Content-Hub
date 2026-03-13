@@ -66,12 +66,26 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
             </p>
           </div>
           {!isEdit && (
-            <Link
-              href="/upload/batch"
-              className="shrink-0 inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
-            >
-              Batch Upload
-            </Link>
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <Link
+                href="/upload/batch"
+                className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Batch Upload
+              </Link>
+              <Link
+                href="/upload/youtube"
+                className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                YouTube Import
+              </Link>
+              <Link
+                href="/upload/blogs"
+                className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Import Blogs
+              </Link>
+            </div>
           )}
         </div>
       </div>
