@@ -2,11 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parse } from 'node-html-parser';
 
 const USER_AGENT = 'Mozilla/5.0 (compatible; AxisContentHub/1.0; +https://axis.com)';
-const FETCH_OPTS = {
-  headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9' },
-  signal: AbortSignal.timeout(15000),
-};
 const MAX_RESULTS = 500;
+const SITEMAP_TIMEOUT_MS = 7000;   // per-sitemap fetch
+const PAGE_TIMEOUT_MS = 12000;     // scraping the blog index page
 
 // Extract all <loc> values from a sitemap XML string
 function extractSitemapLocs(xml: string): string[] {
@@ -17,12 +15,12 @@ function extractSitemapLocs(xml: string): string[] {
   return results;
 }
 
-// Explicitly non-blog path segments to skip
-const SKIP_SEGMENTS = /\/(product|products|shop|store|cart|checkout|account|login|register|signup|wp-content|wp-includes|wp-admin|wp-login|wp-json|feed|tag|category|author|search|page\/\d)\//i;
-const SKIP_EXTENSIONS = /\.(xml|json|rss|atom|jpg|jpeg|png|gif|svg|pdf|css|js|woff|woff2)$/i;
-
-// Blog-like path keywords
-const BLOG_SEGMENTS = /\/(blog|article|articles|news|post|posts|insight|insights|update|updates|story|stories|resource|resources|press|media)\//i;
+const SKIP_SEGMENTS =
+  /\/(product|products|shop|store|cart|checkout|account|login|register|signup|wp-content|wp-includes|wp-admin|wp-login|wp-json|feed|tag|category|author|search|page\/\d)\//i;
+const SKIP_EXTENSIONS =
+  /\.(xml|json|rss|atom|jpg|jpeg|png|gif|svg|pdf|css|js|woff|woff2)$/i;
+const BLOG_SEGMENTS =
+  /\/(blog|article|articles|news|post|posts|insight|insights|update|updates|story|stories|resource|resources|press|media)\//i;
 
 function isLikelyBlogPost(url: string, rootHostname: string): boolean {
   try {
@@ -32,7 +30,6 @@ function isLikelyBlogPost(url: string, rootHostname: string): boolean {
     if (path === '/' || path === '') return false;
     if (SKIP_EXTENSIONS.test(path)) return false;
     if (SKIP_SEGMENTS.test(path)) return false;
-    // Must either be under a known blog segment OR be a slug-like leaf (depth >= 2, has hyphens)
     const hasBlogSegment = BLOG_SEGMENTS.test(path);
     const segments = path.replace(/^\/|\/$/g, '').split('/').filter(Boolean);
     const lastSegment = segments[segments.length - 1] || '';
@@ -43,70 +40,97 @@ function isLikelyBlogPost(url: string, rootHostname: string): boolean {
   }
 }
 
-// Sitemap whose URL suggests it's blog-specific
-function isBlogSitemap(sitemapUrl: string): boolean {
+function isBlogSitemapUrl(sitemapUrl: string): boolean {
   return /blog|post|article|news|insight|story/i.test(sitemapUrl);
 }
 
-async function fetchSitemapLocs(sitemapUrl: string): Promise<string[]> {
-  const res = await fetch(sitemapUrl, { ...FETCH_OPTS, signal: AbortSignal.timeout(10000) });
-  if (!res.ok) return [];
-  const text = await res.text();
-  if (!text.includes('<loc>')) return [];
-  return extractSitemapLocs(text);
+// Fetch a single sitemap and return its <loc> entries
+async function fetchLocs(url: string): Promise<string[]> {
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': USER_AGENT },
+      signal: AbortSignal.timeout(SITEMAP_TIMEOUT_MS),
+    });
+    if (!res.ok) return [];
+    const text = await res.text();
+    return extractSitemapLocs(text);
+  } catch {
+    return [];
+  }
 }
 
-async function trySitemap(rootUrl: URL, blogPrefix: string | null): Promise<{ urls: string[]; source: string } | null> {
-  const candidates = [
-    `${rootUrl.origin}/sitemap.xml`,
-    `${rootUrl.origin}/sitemap_index.xml`,
-    `${rootUrl.origin}/post-sitemap.xml`,
-    `${rootUrl.origin}/blog-sitemap.xml`,
+async function discoverFromSitemap(
+  origin: string,
+  blogPrefix: string | null,
+  rootHostname: string,
+): Promise<string[] | null> {
+  // Step 1: Try blog-specific sitemaps in parallel (fastest path)
+  const blogSitemapCandidates = [
+    `${origin}/post-sitemap.xml`,
+    `${origin}/blog-sitemap.xml`,
+    `${origin}/news-sitemap.xml`,
   ];
 
-  for (const sitemapUrl of candidates) {
+  const blogResults = await Promise.all(blogSitemapCandidates.map(fetchLocs));
+  for (const locs of blogResults) {
+    if (locs.length === 0) continue;
+    const hits = blogPrefix
+      ? locs.filter((u) => u.startsWith(blogPrefix))
+      : locs.filter((u) => isLikelyBlogPost(u, rootHostname));
+    if (hits.length > 0) return locs;
+  }
+
+  // Step 2: Try the main sitemap / sitemap index
+  const mainCandidates = [`${origin}/sitemap.xml`, `${origin}/sitemap_index.xml`];
+
+  for (const sitemapUrl of mainCandidates) {
     try {
-      const res = await fetch(sitemapUrl, { ...FETCH_OPTS, signal: AbortSignal.timeout(10000) });
+      const res = await fetch(sitemapUrl, {
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(SITEMAP_TIMEOUT_MS),
+      });
       if (!res.ok) continue;
       const text = await res.text();
       if (!text.includes('<loc>') && !text.includes('<sitemap>')) continue;
 
-      // Sitemap index — fetch nested sitemaps
+      // Is it a sitemap index?
       if (text.includes('<sitemapindex') || (text.includes('<sitemap>') && !text.includes('<urlset'))) {
         const nestedUrls = extractSitemapLocs(text);
 
-        // 1. First try sitemaps that mention 'blog' / 'post' in their URL
-        const blogSitemaps = nestedUrls.filter(isBlogSitemap);
-        const otherSitemaps = nestedUrls.filter((u) => !isBlogSitemap(u));
-        const orderedNested = [...blogSitemaps, ...otherSitemaps].slice(0, 10);
+        // Prefer blog-named nested sitemaps — fetch those in parallel first
+        const blogNested = nestedUrls.filter(isBlogSitemapUrl).slice(0, 4);
+        const otherNested = nestedUrls.filter((u) => !isBlogSitemapUrl(u)).slice(0, 4);
 
-        const allLocs: string[] = [];
-        for (const nested of orderedNested) {
-          const locs = await fetchSitemapLocs(nested);
-          allLocs.push(...locs);
-          // If we already have enough blog-specific hits from a blog sitemap, stop early
-          if (blogSitemaps.includes(nested) && locs.length > 0) {
-            // Filter immediately and check if we have results
-            const hits = blogPrefix
-              ? locs.filter((u) => u.startsWith(blogPrefix))
-              : locs.filter((u) => isLikelyBlogPost(u, rootUrl.hostname));
-            if (hits.length > 0) {
-              return { urls: allLocs, source: 'sitemap' };
-            }
-          }
+        if (blogNested.length > 0) {
+          const results = await Promise.all(blogNested.map(fetchLocs));
+          const locs = results.flat();
+          const hits = blogPrefix
+            ? locs.filter((u) => u.startsWith(blogPrefix))
+            : locs.filter((u) => isLikelyBlogPost(u, rootHostname));
+          if (hits.length > 0) return locs;
         }
-        if (allLocs.length > 0) return { urls: allLocs, source: 'sitemap' };
+
+        // No blog-specific sitemap found — fetch other nested sitemaps in parallel
+        if (otherNested.length > 0) {
+          const results = await Promise.all(otherNested.map(fetchLocs));
+          return results.flat();
+        }
       } else {
+        // Regular sitemap — return all locs directly
         const locs = extractSitemapLocs(text);
-        if (locs.length > 0) return { urls: locs, source: 'sitemap' };
+        if (locs.length > 0) return locs;
       }
     } catch { /* try next */ }
   }
+
   return null;
 }
 
 async function scrapePageLinks(url: string, rootHostname: string): Promise<string[]> {
-  const res = await fetch(url, FETCH_OPTS);
+  const res = await fetch(url, {
+    headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
+    signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
+  });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
   const root = parse(html);
@@ -141,63 +165,56 @@ export async function POST(request: NextRequest) {
     }
 
     const rootHostname = rootUrl.hostname;
-
-    // If the user gave a specific path (e.g. /blog/), use it as a prefix filter
     const userPath = rootUrl.pathname.replace(/\/$/, '');
     const blogPrefix = userPath && userPath !== ''
       ? `${rootUrl.origin}${userPath}/`
       : null;
 
-    // 1. Try sitemap
+    // 1. Try sitemap discovery
     let allUrls: string[] = [];
     let source = 'sitemap';
 
     try {
-      const sitemapResult = await trySitemap(rootUrl, blogPrefix);
-      if (sitemapResult) {
-        allUrls = sitemapResult.urls;
-        source = sitemapResult.source;
-      }
+      const sitemapUrls = await discoverFromSitemap(rootUrl.origin, blogPrefix, rootHostname);
+      if (sitemapUrls) allUrls = sitemapUrls;
     } catch { /* fall through */ }
 
-    // 2. If no sitemap results, scrape the page the user gave
+    // 2. If sitemap gave nothing, scrape the user's page directly
     if (allUrls.length === 0) {
       source = 'page';
       try {
         allUrls = await scrapePageLinks(url, rootHostname);
       } catch (err) {
         return NextResponse.json({
-          error: `Could not fetch the page: ${err instanceof Error ? err.message : 'Unknown error'}. Check the URL and try again.`,
+          error: `Could not reach "${url}": ${err instanceof Error ? err.message : 'timeout'}. The site may be slow or blocking automated access. Try again in a moment.`,
         }, { status: 422 });
       }
     }
 
-    // 3. Filter — if user gave a specific path, ONLY show URLs under that path.
-    //    Otherwise, use blog-post heuristics.
+    // 3. Filter — if user gave a specific path, only show URLs under that path
     let filtered: string[];
     if (blogPrefix) {
-      // Exact prefix match first
       filtered = allUrls.filter((u) => u.startsWith(blogPrefix));
-      // If nothing matched, fall back to heuristics (maybe their /blog/ page uses a different path)
       if (filtered.length === 0) {
+        // Fallback: heuristic filter (maybe their blog uses a different URL structure)
         filtered = allUrls.filter((u) => isLikelyBlogPost(u, rootHostname));
       }
     } else {
       filtered = allUrls.filter((u) => isLikelyBlogPost(u, rootHostname));
     }
 
-    // Deduplicate and sort
-    const seenUrls = new Set<string>();
+    // 4. Deduplicate, sort, cap
+    const seen = new Set<string>();
     const unique: string[] = [];
     for (const u of filtered) {
-      if (!seenUrls.has(u)) { seenUrls.add(u); unique.push(u); }
+      if (!seen.has(u)) { seen.add(u); unique.push(u); }
     }
     unique.sort();
     const result = unique.slice(0, MAX_RESULTS);
 
     if (result.length === 0) {
       return NextResponse.json({
-        error: `No blog posts found under "${url}". The sitemap may list posts under a different path — try entering your blog index URL directly (e.g. https://example.com/blog).`,
+        error: `No blog posts were found under "${url}". If your posts live at a different path, try entering that URL directly (e.g. https://example.com/news or https://example.com/articles).`,
         urls: [],
         source,
         total: 0,
