@@ -138,6 +138,31 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
             )}
           </div>
 
+          {/* Additional image files gallery */}
+          {(item as any).file_urls?.length > 0 && (
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                Additional Files ({(item as any).file_urls.length})
+              </h2>
+              <div className="grid grid-cols-2 gap-2">
+                {(item as any).file_urls.map((url: string, i: number) => {
+                  const isImg = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(url);
+                  return isImg ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border hover:opacity-80 transition-opacity">
+                      <img src={url} alt={`File ${i + 2}`} className="w-full aspect-square object-cover" />
+                    </a>
+                  ) : (
+                    <a key={url} href={url} download className="flex items-center gap-2 p-3 rounded-lg border text-sm hover:bg-muted/50 transition-colors">
+                      <Download className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{url.split('/').pop()?.replace(/^[^-]+-/, '') || `File ${i + 2}`}</span>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Archived blog content */}
           {archivedBlog?.text_content && (
             <div className="rounded-lg border bg-card p-6">
@@ -199,6 +224,15 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
                 </a>
               </Button>
             )}
+            {/* Additional files */}
+            {(item as any).file_urls?.length > 0 && (item as any).file_urls.map((url: string, i: number) => (
+              <Button key={url} variant="outline" asChild className="w-full">
+                <a href={url} download>
+                  <Download className="h-4 w-4" />
+                  Download File {i + 2}
+                </a>
+              </Button>
+            ))}
             {item.external_link && (
               <Button variant="outline" asChild className="w-full">
                 <a href={item.external_link} target="_blank" rel="noopener noreferrer">

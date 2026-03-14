@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parse } from 'node-html-parser';
 
-const USER_AGENT = 'Mozilla/5.0 (compatible; AxisContentHub/1.0; +https://axis.com)';
+const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
+const BROWSER_HEADERS = {
+  'User-Agent': USER_AGENT,
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.5',
+  'Cache-Control': 'no-cache',
+};
 const MAX_RESULTS = 500;
 const SITEMAP_TIMEOUT_MS = 7000;   // per-sitemap fetch
 const PAGE_TIMEOUT_MS = 12000;     // scraping the blog index page
@@ -48,7 +54,7 @@ function isBlogSitemapUrl(sitemapUrl: string): boolean {
 async function fetchLocs(url: string): Promise<string[]> {
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT },
+      headers: BROWSER_HEADERS,
       signal: AbortSignal.timeout(SITEMAP_TIMEOUT_MS),
     });
     if (!res.ok) return [];
@@ -86,7 +92,7 @@ async function discoverFromSitemap(
   for (const sitemapUrl of mainCandidates) {
     try {
       const res = await fetch(sitemapUrl, {
-        headers: { 'User-Agent': USER_AGENT },
+        headers: BROWSER_HEADERS,
         signal: AbortSignal.timeout(SITEMAP_TIMEOUT_MS),
       });
       if (!res.ok) continue;
@@ -128,7 +134,7 @@ async function discoverFromSitemap(
 
 async function scrapePageLinks(url: string, rootHostname: string): Promise<string[]> {
   const res = await fetch(url, {
-    headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
+    headers: BROWSER_HEADERS,
     signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
