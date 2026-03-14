@@ -69,6 +69,7 @@ export interface ContentItem {
   description: string | null;
   content_type: string; // text after migration 004 (was content_type_enum)
   file_url: string | null;
+  file_urls: string[]; // additional files (migration 005+)
   backup_url: string | null;
   external_link: string | null;
   thumbnail_url: string | null;
@@ -179,6 +180,7 @@ export interface UploadCompleteRequest {
   content_type: string;
   file_path?: string;
   file_url?: string;
+  file_urls?: string[];
   external_link?: string;
   thumbnail_url?: string;
   product_tags?: string[];

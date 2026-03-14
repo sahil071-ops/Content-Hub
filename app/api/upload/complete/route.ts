@@ -13,6 +13,11 @@ async function getAuthedProfile(supabase: ReturnType<typeof createClient>) {
   return { user, profile };
 }
 
+// Check if an error is about a missing column (migration not yet run)
+function isMissingColumnError(msg: string): boolean {
+  return msg.includes('medium_tags') || msg.includes('file_urls') || msg.includes('schema cache');
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const supabase = createClient();
@@ -25,12 +30,13 @@ export async function PATCH(request: NextRequest) {
     const body: UploadCompleteRequest & {
       id: string;
       status?: 'draft' | 'published';
+      file_urls?: string[];
     } = await request.json();
 
     const {
       id, title, description, content_type, file_url, external_link,
       thumbnail_url, product_tags, topic_tags, audience_tags, medium_tags,
-      file_size_bytes, file_type_mime, meta, status = 'draft',
+      file_size_bytes, file_type_mime, meta, status = 'draft', file_urls,
     } = body;
 
     if (!id) return NextResponse.json({ error: 'ID is required.' }, { status: 400 });
@@ -38,43 +44,58 @@ export async function PATCH(request: NextRequest) {
 
     const now = new Date().toISOString();
 
-    // Get existing published_at so we don't reset it on re-publish
     const { data: existing } = await supabase
       .from('content_items')
       .select('published_at')
       .eq('id', id)
       .single() as { data: { published_at: string | null } | null; error: unknown };
 
-    const updatePayload: Record<string, unknown> = {
-      title,
-      description: description || null,
-      content_type,
-      product_tags: product_tags || [],
-      topic_tags: topic_tags || [],
-      audience_tags: (audience_tags || []) as unknown,
-      medium_tags: medium_tags || [],
-      status,
-      published_at: status === 'published' ? (existing?.published_at || now) : null,
+    const buildPayload = (includeMediumTags: boolean, includeFileUrls: boolean): Record<string, unknown> => {
+      const p: Record<string, unknown> = {
+        title,
+        description: description || null,
+        content_type,
+        product_tags: product_tags || [],
+        topic_tags: topic_tags || [],
+        audience_tags: (audience_tags || []) as unknown,
+        status,
+        published_at: status === 'published' ? (existing?.published_at || now) : null,
+      };
+      if (includeMediumTags) p.medium_tags = medium_tags || [];
+      if (includeFileUrls) p.file_urls = file_urls || [];
+      if (file_url) p.file_url = file_url;
+      if (external_link !== undefined) p.external_link = external_link || null;
+      if (thumbnail_url) p.thumbnail_url = thumbnail_url;
+      if (file_size_bytes) p.file_size_bytes = file_size_bytes;
+      if (file_type_mime) p.file_type = file_type_mime;
+      if (meta) p.meta = meta;
+      return p;
     };
-    if (file_url) updatePayload.file_url = file_url;
-    if (external_link !== undefined) updatePayload.external_link = external_link || null;
-    if (thumbnail_url) updatePayload.thumbnail_url = thumbnail_url;
-    if (file_size_bytes) updatePayload.file_size_bytes = file_size_bytes;
-    if (file_type_mime) updatePayload.file_type = file_type_mime;
-    if (meta) updatePayload.meta = meta;
 
-    const { data: item, error } = await supabase
+    let { data: item, error } = await supabase
       .from('content_items')
-      .update(updatePayload)
+      .update(buildPayload(true, true))
       .eq('id', id)
       .select('id')
       .single();
+
+    // Defensive: retry without optional columns if migration hasn't been run
+    if (error && isMissingColumnError(error.message)) {
+      const retry = await supabase
+        .from('content_items')
+        .update(buildPayload(false, false))
+        .eq('id', id)
+        .select('id')
+        .single();
+      item = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       return NextResponse.json({ error: 'Failed to update content.', detail: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ id: item.id, success: true });
+    return NextResponse.json({ id: item!.id, success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -93,12 +114,13 @@ export async function POST(request: NextRequest) {
     const body: UploadCompleteRequest & {
       status?: 'draft' | 'published';
       file_path?: string;
+      file_urls?: string[];
     } = await request.json();
 
     const {
       title, description, content_type, file_url, external_link,
       thumbnail_url, product_tags, topic_tags, audience_tags, medium_tags,
-      file_size_bytes, file_type_mime, meta, status = 'draft',
+      file_size_bytes, file_type_mime, meta, status = 'draft', file_urls,
     } = body;
 
     if (!title) {
@@ -107,39 +129,53 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString();
 
-    const { data: item, error } = await supabase
+    const buildInsert = (includeMediumTags: boolean, includeFileUrls: boolean) => ({
+      title,
+      description: description || null,
+      content_type,
+      file_url: file_url || null,
+      external_link: external_link || null,
+      thumbnail_url: thumbnail_url || null,
+      product_tags: product_tags || [],
+      topic_tags: topic_tags || [],
+      audience_tags: (audience_tags || []) as any,
+      ...(includeMediumTags ? { medium_tags: medium_tags || [] } : {}),
+      ...(includeFileUrls ? { file_urls: file_urls || [] } : {}),
+      status,
+      published_at: status === 'published' ? now : null,
+      created_by: user.id,
+      file_size_bytes: file_size_bytes || null,
+      file_type: file_type_mime || null,
+      meta: meta || {},
+      engagement_data: {},
+    });
+
+    let { data: item, error } = await supabase
       .from('content_items')
-      .insert({
-        title,
-        description: description || null,
-        content_type,
-        file_url: file_url || null,
-        external_link: external_link || null,
-        thumbnail_url: thumbnail_url || null,
-        product_tags: product_tags || [],
-        topic_tags: topic_tags || [],
-        audience_tags: (audience_tags || []) as any,
-        medium_tags: medium_tags || [],
-        status,
-        published_at: status === 'published' ? now : null,
-        created_by: user.id,
-        file_size_bytes: file_size_bytes || null,
-        file_type: file_type_mime || null,
-        meta: meta || {},
-        engagement_data: {},
-      })
+      .insert(buildInsert(true, true))
       .select('id')
       .single();
+
+    // Defensive: retry without optional columns if migration hasn't been run
+    if (error && isMissingColumnError(error.message)) {
+      const retry = await supabase
+        .from('content_items')
+        .insert(buildInsert(false, false))
+        .select('id')
+        .single();
+      item = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       return NextResponse.json({
         error: 'Failed to save content to database.',
         detail: error.message,
-        hint: 'Check that your Supabase credentials are correct and the database migration has been run.',
+        hint: 'Run migration 005 in Supabase SQL Editor to add missing columns.',
       }, { status: 500 });
     }
 
-    return NextResponse.json({ id: item.id, success: true });
+    return NextResponse.json({ id: item!.id, success: true });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });

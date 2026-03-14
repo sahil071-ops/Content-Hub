@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Save, Upload, Plus, X, Check } from 'lucide-react';
+import { Loader2, Save, Upload, Plus, X, Check, Paperclip, File as FileIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +68,10 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
   const [uploadProgress, setUploadProgress] = useState<number | undefined>(undefined);
   const [existingFileUrl] = useState<string | null>(initialData?.file_url || null);
   const [existingThumbnailUrl] = useState<string | null>(initialData?.thumbnail_url || null);
+  // Additional files (multi-file feature)
+  const [additionalFiles, setAdditionalFiles] = useState<File[]>([]);
+  const [existingFileUrls, setExistingFileUrls] = useState<string[]>((initialData as any)?.file_urls || []);
+  const additionalFileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialise YouTube data from existing item
   const initYoutubeData = initialData?.content_type === 'video' && initialData.meta?.youtube
@@ -259,6 +263,24 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
         }
       }
 
+      // ── Upload additional files to R2 ─────────────────────────
+      const additionalFileUrls: string[] = [...existingFileUrls];
+      for (const addFile of additionalFiles) {
+        const presignRes = await fetch('/api/upload/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: addFile.name,
+            content_type_mime: addFile.type,
+            content_type: values.content_type,
+          }),
+        });
+        const presignJson = await presignRes.json();
+        if (!presignRes.ok) continue; // skip failed files, don't block whole submit
+        await fetch(presignJson.upload_url, { method: 'PUT', body: addFile, headers: { 'Content-Type': addFile.type } });
+        additionalFileUrls.push(presignJson.public_url);
+      }
+
       // ── Build meta ──────────────────────────────────────────────
       const meta: Record<string, unknown> = isEdit ? { ...(initialData?.meta || {}) } : {};
       if (youtubeData) meta.youtube = youtubeData;
@@ -274,6 +296,7 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
         ...(isEdit && { id: initialData!.id }),
         ...values,
         file_url: fileUrl,
+        file_urls: additionalFileUrls,
         external_link: externalLink,
         thumbnail_url: thumbnailUrl,
         file_size_bytes: file?.size ?? (isEdit ? initialData?.file_size_bytes ?? undefined : undefined),
@@ -408,6 +431,77 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
               <p className="text-xs font-medium">PDF thumbnail auto-generated</p>
               <p className="text-xs text-muted-foreground">First page preview will be shown in the library.</p>
             </div>
+          </div>
+        )}
+
+        {/* ── Additional Files ──────────────────────────────────── */}
+        {!isYouTube && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs text-muted-foreground">Additional files (optional)</Label>
+              <button
+                type="button"
+                onClick={() => additionalFileInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+              >
+                <Paperclip className="h-3 w-3" />
+                Add files
+              </button>
+              <input
+                ref={additionalFileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  setAdditionalFiles((prev) => [...prev, ...files]);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+
+            {/* Show existing URLs (when editing) */}
+            {existingFileUrls.length > 0 && (
+              <div className="space-y-1">
+                {existingFileUrls.map((url, i) => (
+                  <div key={url} className="flex items-center gap-2 text-xs bg-muted/30 rounded px-2 py-1.5">
+                    <FileIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <span className="truncate flex-1 text-muted-foreground">{url.split('/').pop()}</span>
+                    <button
+                      type="button"
+                      onClick={() => setExistingFileUrls((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Show newly selected files */}
+            {additionalFiles.length > 0 && (
+              <div className="space-y-1">
+                {additionalFiles.map((f, i) => (
+                  <div key={`${f.name}-${i}`} className="flex items-center gap-2 text-xs bg-muted/30 rounded px-2 py-1.5">
+                    {f.type.startsWith('image/') ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={URL.createObjectURL(f)} alt={f.name} className="h-6 w-6 object-cover rounded shrink-0" />
+                    ) : (
+                      <FileIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="truncate flex-1">{f.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setAdditionalFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>
