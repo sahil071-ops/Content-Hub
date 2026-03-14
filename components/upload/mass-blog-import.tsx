@@ -2,10 +2,11 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Globe, Loader2, AlertCircle, CheckCircle2, X, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Globe, Loader2, AlertCircle, CheckCircle2, List } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
@@ -27,7 +28,9 @@ interface MassBlogImportProps {
 
 export function MassBlogImport({ productTags, topicTags }: MassBlogImportProps) {
   const router = useRouter();
+  const [tab, setTab] = useState<'auto' | 'manual'>('auto');
   const [inputUrl, setInputUrl] = useState('');
+  const [manualText, setManualText] = useState('');
   const [crawling, setCrawling] = useState(false);
   const [crawlError, setCrawlError] = useState<string | null>(null);
   const [crawlSource, setCrawlSource] = useState<string | null>(null);
@@ -35,6 +38,18 @@ export function MassBlogImport({ productTags, topicTags }: MassBlogImportProps) 
   const [importing, setImporting] = useState(false);
   const [importDone, setImportDone] = useState(false);
   const abortRef = useRef(false);
+
+  function handleManualLoad() {
+    const urls = manualText
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.startsWith('http'));
+    if (urls.length === 0) return;
+    setCrawlError(null);
+    setCrawlSource('manual');
+    setImportDone(false);
+    setUrlItems(urls.map((url) => ({ url, selected: true, status: 'idle' })));
+  }
 
   async function handleCrawl() {
     const trimmed = inputUrl.trim();
@@ -171,41 +186,87 @@ export function MassBlogImport({ productTags, topicTags }: MassBlogImportProps) 
 
   return (
     <div className="space-y-6">
-      {/* URL Input */}
-      <div className="space-y-2">
-        <Label>Website or Blog URL</Label>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="https://example.com/blog"
-              value={inputUrl}
-              onChange={(e) => { setInputUrl(e.target.value); setCrawlError(null); }}
-              className="pl-9"
-              type="url"
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCrawl(); } }}
-              disabled={crawling || importing}
-            />
-          </div>
-          <Button
-            type="button"
-            onClick={handleCrawl}
-            disabled={!inputUrl.trim() || crawling || importing}
-            className="bg-[#2323A3] hover:bg-[#2323A3]/90 shrink-0"
-          >
-            {crawling ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Find Posts'}
-          </Button>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Enter your blog URL — or paste a sitemap XML URL directly (e.g. <span className="font-mono">https://example.com/sitemap.xml</span>) to bypass Cloudflare blocks.
-        </p>
-        {crawlError && (
-          <div className="flex items-start gap-2 text-destructive text-sm">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-            <span className="whitespace-pre-wrap">{crawlError}</span>
-          </div>
-        )}
+      {/* Tab switcher */}
+      <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+        <button
+          type="button"
+          onClick={() => { setTab('auto'); setCrawlError(null); }}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${tab === 'auto' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <Globe className="h-3.5 w-3.5" /> Auto-detect
+        </button>
+        <button
+          type="button"
+          onClick={() => { setTab('manual'); setCrawlError(null); }}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${tab === 'manual' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <List className="h-3.5 w-3.5" /> Paste URLs
+        </button>
       </div>
+
+      {tab === 'auto' ? (
+        /* Auto-detect input */
+        <div className="space-y-2">
+          <Label>Website or Blog URL</Label>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="https://example.com/blog"
+                value={inputUrl}
+                onChange={(e) => { setInputUrl(e.target.value); setCrawlError(null); }}
+                className="pl-9"
+                type="url"
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCrawl(); } }}
+                disabled={crawling || importing}
+              />
+            </div>
+            <Button
+              type="button"
+              onClick={handleCrawl}
+              disabled={!inputUrl.trim() || crawling || importing}
+              className="bg-[#2323A3] hover:bg-[#2323A3]/90 shrink-0"
+            >
+              {crawling ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Find Posts'}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Enter your blog URL — we scan the sitemap, RSS feed, and page links. Or paste a sitemap XML URL directly (e.g. <span className="font-mono">https://example.com/sitemap.xml</span>).
+          </p>
+          {crawlError && (
+            <div className="flex items-start gap-2 text-destructive text-sm">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span className="whitespace-pre-wrap">{crawlError}</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Manual paste input */
+        <div className="space-y-2">
+          <Label>Paste Blog Post URLs</Label>
+          <Textarea
+            placeholder={"https://example.com/blog/post-1\nhttps://example.com/blog/post-2\nhttps://example.com/blog/post-3"}
+            value={manualText}
+            onChange={(e) => setManualText(e.target.value)}
+            rows={6}
+            className="font-mono text-xs"
+            disabled={importing}
+          />
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              One URL per line. Use this if auto-detect is blocked by Cloudflare.
+            </p>
+            <Button
+              type="button"
+              onClick={handleManualLoad}
+              disabled={!manualText.trim() || importing}
+              className="bg-[#2323A3] hover:bg-[#2323A3]/90 shrink-0"
+            >
+              Load URLs
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Results */}
       {urlItems.length > 0 && (

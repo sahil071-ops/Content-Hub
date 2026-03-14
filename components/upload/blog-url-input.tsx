@@ -14,6 +14,8 @@ export interface ArchivedBlogData {
   og_image: string | null;
   text_content: string;
   archived_at: string;
+  partial?: boolean;       // true when content couldn't be fetched (e.g. Cloudflare blocked)
+  partial_reason?: string; // human-readable explanation
 }
 
 interface BlogUrlInputProps {
@@ -61,9 +63,12 @@ export function BlogUrlInput({ onData, data }: BlogUrlInputProps) {
 
   if (data) {
     return (
-      <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+      <div className={`rounded-lg border p-4 space-y-2 ${data.partial ? 'bg-amber-50/50 border-amber-200' : 'bg-muted/30'}`}>
         <div className="flex items-start gap-2">
-          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+          {data.partial
+            ? <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            : <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+          }
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium line-clamp-2">{data.title}</p>
             <p className="text-xs text-muted-foreground truncate mt-0.5">{data.url}</p>
@@ -75,9 +80,15 @@ export function BlogUrlInput({ onData, data }: BlogUrlInputProps) {
         {data.description && (
           <p className="text-xs text-muted-foreground line-clamp-2">{data.description}</p>
         )}
-        <p className="text-xs text-emerald-600 font-medium">
-          ✓ Content archived — saved even if the original is removed
-        </p>
+        {data.partial ? (
+          <p className="text-xs text-amber-700 font-medium">
+            ⚠ Link saved — site blocked content archiving (Cloudflare). You can still save and manually edit the title/description.
+          </p>
+        ) : (
+          <p className="text-xs text-emerald-600 font-medium">
+            ✓ Content archived — saved even if the original is removed
+          </p>
+        )}
       </div>
     );
   }

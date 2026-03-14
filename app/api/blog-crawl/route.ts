@@ -77,6 +77,47 @@ async function fetchLocs(url: string): Promise<string[]> {
   return [];
 }
 
+// Parse an RSS/Atom feed and extract post URLs
+function extractRssUrls(xml: string): string[] {
+  const results: string[] = [];
+  // RSS <link> tags (the non-self-closing ones that contain URLs)
+  const rssRe = /<link>([^<]+)<\/link>/gi;
+  // Atom <link href="..." rel="alternate">
+  const atomRe = /<link[^>]+rel=["']alternate["'][^>]+href=["']([^"']+)["']/gi;
+  const atomRe2 = /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']alternate["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = rssRe.exec(xml)) !== null) {
+    const u = m[1].trim();
+    if (u.startsWith('http')) results.push(u);
+  }
+  while ((m = atomRe.exec(xml)) !== null) results.push(m[1].trim());
+  while ((m = atomRe2.exec(xml)) !== null) results.push(m[1].trim());
+  return results;
+}
+
+// Try common RSS/Atom feed paths — WordPress /feed/ is often allowed through Cloudflare
+async function discoverFromRss(origin: string, blogPrefix: string | null, rootHostname: string): Promise<string[] | null> {
+  const feedPaths = ['/feed/', '/feed/rss2/', '/rss/', '/rss.xml', '/atom.xml', '/blog/feed/', '/news/feed/'];
+  for (const path of feedPaths) {
+    try {
+      const res = await fetch(`${origin}${path}`, {
+        headers: SITEMAP_HEADERS,
+        signal: AbortSignal.timeout(SITEMAP_TIMEOUT_MS),
+      });
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (!text.includes('<rss') && !text.includes('<feed') && !text.includes('<channel')) continue;
+      const urls = extractRssUrls(text);
+      if (urls.length === 0) continue;
+      const filtered = blogPrefix
+        ? urls.filter((u) => u.startsWith(blogPrefix))
+        : urls.filter((u) => isLikelyBlogPost(u, rootHostname));
+      if (filtered.length > 0) return urls;
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
 async function discoverFromSitemap(
   origin: string,
   blogPrefix: string | null,
@@ -234,7 +275,15 @@ export async function POST(request: NextRequest) {
       if (sitemapUrls) allUrls = sitemapUrls;
     } catch { /* fall through */ }
 
-    // 2. If sitemap gave nothing, scrape the user's page directly
+    // 2. Sitemap blocked / empty — try RSS/Atom feed (often allowed through Cloudflare)
+    if (allUrls.length === 0) {
+      try {
+        const rssUrls = await discoverFromRss(rootUrl.origin, blogPrefix, rootHostname);
+        if (rssUrls) { allUrls = rssUrls; source = 'rss'; }
+      } catch { /* fall through */ }
+    }
+
+    // 3. RSS also empty — scrape the user's page directly
     if (allUrls.length === 0) {
       source = 'page';
       try {
