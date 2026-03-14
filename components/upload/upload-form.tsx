@@ -87,8 +87,6 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
   const [thumbnailDataUrl, setThumbnailDataUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  // Track whether user has manually picked a content type (prevents auto-detect from overriding it)
-  const [typeManuallySet, setTypeManuallySet] = useState(!!initialData?.content_type);
 
   // ── Tag states ─────────────────────────────────────────────────
   const [allProductTags, setAllProductTags] = useState<TagRow[]>(productTags);
@@ -125,22 +123,27 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
 
   // ── Handlers ───────────────────────────────────────────────────
 
+  // Types that are "compatible" with a given MIME category — don't auto-override these
+  const IMAGE_COMPATIBLE = new Set(['image', 'poster', 'graphic', 'flier', 'catalogue', 'emailer']);
+  const VIDEO_COMPATIBLE = new Set(['video', 'video_file']);
+  const PDF_COMPATIBLE = new Set(['pdf', 'whitepaper', 'ebook']);
+  const PRESENTATION_COMPATIBLE = new Set(['presentation']);
+
   async function handleFileAccepted(f: File) {
     setFile(f);
-    // Auto-detect content type from MIME only when user hasn't explicitly chosen one
-    if (!typeManuallySet) {
-      if (f.type.startsWith('image/')) {
-        setValue('content_type', 'image');
-      } else if (f.type.startsWith('video/')) {
-        setValue('content_type', 'video_file');
-      } else if (f.type === 'application/pdf') {
-        setValue('content_type', 'pdf');
-      } else if (
-        f.type === 'application/vnd.ms-powerpoint' ||
-        f.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-      ) {
-        setValue('content_type', 'presentation');
-      }
+    // Auto-detect content type from MIME only if current type is incompatible with the file
+    const currentType = watch('content_type');
+    if (f.type.startsWith('image/')) {
+      if (!IMAGE_COMPATIBLE.has(currentType)) setValue('content_type', 'image');
+    } else if (f.type.startsWith('video/')) {
+      if (!VIDEO_COMPATIBLE.has(currentType)) setValue('content_type', 'video_file');
+    } else if (f.type === 'application/pdf') {
+      if (!PDF_COMPATIBLE.has(currentType)) setValue('content_type', 'pdf');
+    } else if (
+      f.type === 'application/vnd.ms-powerpoint' ||
+      f.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    ) {
+      if (!PRESENTATION_COMPATIBLE.has(currentType)) setValue('content_type', 'presentation');
     }
     // Always generate PDF thumbnail regardless of whether type was manually set
     if (f.type === 'application/pdf') {
@@ -361,7 +364,6 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
           <Select
             value={contentType}
             onValueChange={(val) => {
-              setTypeManuallySet(true);
               setValue('content_type', val);
               setFile(null);
               setYoutubeData(null);

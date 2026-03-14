@@ -2,11 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parse } from 'node-html-parser';
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
+// Googlebot UA: whitelisted by Cloudflare and most WAFs to preserve SEO crawlability
+const GOOGLEBOT_UA = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
 const BROWSER_HEADERS = {
   'User-Agent': USER_AGENT,
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
   'Accept-Language': 'en-US,en;q=0.5',
   'Cache-Control': 'no-cache',
+};
+const SITEMAP_HEADERS = {
+  'User-Agent': GOOGLEBOT_UA,
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
 };
 const MAX_RESULTS = 500;
 const SITEMAP_TIMEOUT_MS = 7000;   // per-sitemap fetch
@@ -50,19 +56,25 @@ function isBlogSitemapUrl(sitemapUrl: string): boolean {
   return /blog|post|article|news|insight|story/i.test(sitemapUrl);
 }
 
-// Fetch a single sitemap and return its <loc> entries
+// Fetch a single sitemap and return its <loc> entries.
+// Uses Googlebot UA (whitelisted by Cloudflare) with Chrome UA fallback.
 async function fetchLocs(url: string): Promise<string[]> {
-  try {
-    const res = await fetch(url, {
-      headers: BROWSER_HEADERS,
-      signal: AbortSignal.timeout(SITEMAP_TIMEOUT_MS),
-    });
-    if (!res.ok) return [];
-    const text = await res.text();
-    return extractSitemapLocs(text);
-  } catch {
-    return [];
+  // Try Googlebot UA first (bypasses Cloudflare WAF which whitelists it for SEO)
+  for (const headers of [SITEMAP_HEADERS, BROWSER_HEADERS]) {
+    try {
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(SITEMAP_TIMEOUT_MS),
+      });
+      if (!res.ok) continue;
+      const text = await res.text();
+      const locs = extractSitemapLocs(text);
+      if (locs.length > 0) return locs;
+    } catch {
+      // try next UA
+    }
   }
+  return [];
 }
 
 async function discoverFromSitemap(
@@ -172,6 +184,43 @@ export async function POST(request: NextRequest) {
 
     const rootHostname = rootUrl.hostname;
     const userPath = rootUrl.pathname.replace(/\/$/, '');
+
+    // ── Direct sitemap URL: user pasted an .xml file URL ─────────────
+    if (/\.xml$/i.test(userPath)) {
+      const locs = await fetchLocs(rootUrl.href);
+      if (locs.length === 0) {
+        return NextResponse.json({
+          error: `Could not read the sitemap at "${url}". The site may be blocking automated access. Try a different sitemap URL.`,
+          urls: [],
+          source: 'sitemap',
+          total: 0,
+        }, { status: 422 });
+      }
+      // If the sitemap is a sitemap index, expand one level
+      const expanded: string[] = [];
+      for (const loc of locs) {
+        if (/\.xml$/i.test(new URL(loc).pathname)) {
+          const nested = await fetchLocs(loc);
+          expanded.push(...nested);
+        } else {
+          expanded.push(loc);
+        }
+      }
+      const posts = (expanded.length > 0 ? expanded : locs)
+        .filter((u) => isLikelyBlogPost(u, rootHostname));
+      const seenPosts = new Set<string>();
+      const unique = posts.filter((u) => seenPosts.has(u) ? false : (seenPosts.add(u), true)).sort().slice(0, MAX_RESULTS);
+      if (unique.length === 0) {
+        return NextResponse.json({
+          error: `The sitemap was read but no blog-post URLs were found. All ${locs.length} entries appear to be non-post pages.`,
+          urls: [],
+          source: 'sitemap',
+          total: 0,
+        });
+      }
+      return NextResponse.json({ urls: unique, source: 'sitemap', total: unique.length });
+    }
+
     const blogPrefix = userPath && userPath !== ''
       ? `${rootUrl.origin}${userPath}/`
       : null;
@@ -192,7 +241,7 @@ export async function POST(request: NextRequest) {
         allUrls = await scrapePageLinks(url, rootHostname);
       } catch (err) {
         return NextResponse.json({
-          error: `Could not reach "${url}": ${err instanceof Error ? err.message : 'timeout'}. The site may be slow or blocking automated access. Try again in a moment.`,
+          error: `Could not reach "${url}": ${err instanceof Error ? err.message : 'timeout'}. The site may be blocking automated access.\n\nTip: If you know the site's sitemap URL (e.g. https://example.com/sitemap.xml or https://example.com/blog-sitemap.xml), paste that directly instead.`,
         }, { status: 422 });
       }
     }
@@ -220,7 +269,7 @@ export async function POST(request: NextRequest) {
 
     if (result.length === 0) {
       return NextResponse.json({
-        error: `No blog posts were found under "${url}". If your posts live at a different path, try entering that URL directly (e.g. https://example.com/news or https://example.com/articles).`,
+        error: `No blog posts were found under "${url}".\n\nTips:\n• If your posts live at a different path, try entering that URL directly (e.g. https://example.com/news).\n• If the site uses Cloudflare, paste the sitemap XML URL directly (e.g. https://example.com/sitemap.xml).`,
         urls: [],
         source,
         total: 0,
