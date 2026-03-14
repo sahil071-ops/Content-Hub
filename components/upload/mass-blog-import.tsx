@@ -56,7 +56,7 @@ export function MassBlogImport({ productTags, topicTags }: MassBlogImportProps) 
         return;
       }
       if (json.total === 0) {
-        setCrawlError('No blog posts found. Try entering the URL of your blog page directly (e.g. https://example.com/blog).');
+        setCrawlError(json.error || 'No blog posts found. Try entering the URL of your blog page directly (e.g. https://example.com/blog).');
         return;
       }
       setCrawlSource(json.source);
@@ -197,12 +197,12 @@ export function MassBlogImport({ productTags, topicTags }: MassBlogImportProps) 
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Enter your blog&apos;s main URL. We&apos;ll scan the sitemap first, then the page itself to find all posts.
+          Enter your blog URL — or paste a sitemap XML URL directly (e.g. <span className="font-mono">https://example.com/sitemap.xml</span>) to bypass Cloudflare blocks.
         </p>
         {crawlError && (
           <div className="flex items-start gap-2 text-destructive text-sm">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-            <span>{crawlError}</span>
+            <span className="whitespace-pre-wrap">{crawlError}</span>
           </div>
         )}
       </div>
