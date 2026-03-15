@@ -4,15 +4,28 @@ import { parse } from 'node-html-parser';
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36';
 // Googlebot UA: whitelisted by Cloudflare and most WAFs to preserve SEO crawlability
 const GOOGLEBOT_UA = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)';
+// Full browser fingerprint headers — Node.js can send Sec-* headers; their absence is a bot signal
 const BROWSER_HEADERS = {
   'User-Agent': USER_AGENT,
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-  'Accept-Language': 'en-US,en;q=0.5',
-  'Cache-Control': 'no-cache',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Cache-Control': 'max-age=0',
+  'Upgrade-Insecure-Requests': '1',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
+  'Sec-Fetch-User': '?1',
+  'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+  'Sec-Ch-Ua-Mobile': '?0',
+  'Sec-Ch-Ua-Platform': '"macOS"',
 };
 const SITEMAP_HEADERS = {
   'User-Agent': GOOGLEBOT_UA,
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Sec-Fetch-Dest': 'document',
+  'Sec-Fetch-Mode': 'navigate',
+  'Sec-Fetch-Site': 'none',
 };
 const MAX_RESULTS = 500;
 const SITEMAP_TIMEOUT_MS = 7000;   // per-sitemap fetch
@@ -75,6 +88,47 @@ async function fetchLocs(url: string): Promise<string[]> {
     }
   }
   return [];
+}
+
+// Parse an RSS/Atom feed and extract post URLs
+function extractRssUrls(xml: string): string[] {
+  const results: string[] = [];
+  // RSS <link> tags (the non-self-closing ones that contain URLs)
+  const rssRe = /<link>([^<]+)<\/link>/gi;
+  // Atom <link href="..." rel="alternate">
+  const atomRe = /<link[^>]+rel=["']alternate["'][^>]+href=["']([^"']+)["']/gi;
+  const atomRe2 = /<link[^>]+href=["']([^"']+)["'][^>]+rel=["']alternate["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = rssRe.exec(xml)) !== null) {
+    const u = m[1].trim();
+    if (u.startsWith('http')) results.push(u);
+  }
+  while ((m = atomRe.exec(xml)) !== null) results.push(m[1].trim());
+  while ((m = atomRe2.exec(xml)) !== null) results.push(m[1].trim());
+  return results;
+}
+
+// Try common RSS/Atom feed paths — WordPress /feed/ is often allowed through Cloudflare
+async function discoverFromRss(origin: string, blogPrefix: string | null, rootHostname: string): Promise<string[] | null> {
+  const feedPaths = ['/feed/', '/feed/rss2/', '/rss/', '/rss.xml', '/atom.xml', '/blog/feed/', '/news/feed/'];
+  for (const path of feedPaths) {
+    try {
+      const res = await fetch(`${origin}${path}`, {
+        headers: SITEMAP_HEADERS,
+        signal: AbortSignal.timeout(SITEMAP_TIMEOUT_MS),
+      });
+      if (!res.ok) continue;
+      const text = await res.text();
+      if (!text.includes('<rss') && !text.includes('<feed') && !text.includes('<channel')) continue;
+      const urls = extractRssUrls(text);
+      if (urls.length === 0) continue;
+      const filtered = blogPrefix
+        ? urls.filter((u) => u.startsWith(blogPrefix))
+        : urls.filter((u) => isLikelyBlogPost(u, rootHostname));
+      if (filtered.length > 0) return urls;
+    } catch { /* try next */ }
+  }
+  return null;
 }
 
 async function discoverFromSitemap(
@@ -234,7 +288,15 @@ export async function POST(request: NextRequest) {
       if (sitemapUrls) allUrls = sitemapUrls;
     } catch { /* fall through */ }
 
-    // 2. If sitemap gave nothing, scrape the user's page directly
+    // 2. Sitemap blocked / empty — try RSS/Atom feed (often allowed through Cloudflare)
+    if (allUrls.length === 0) {
+      try {
+        const rssUrls = await discoverFromRss(rootUrl.origin, blogPrefix, rootHostname);
+        if (rssUrls) { allUrls = rssUrls; source = 'rss'; }
+      } catch { /* fall through */ }
+    }
+
+    // 3. RSS also empty — scrape the user's page directly
     if (allUrls.length === 0) {
       source = 'page';
       try {
