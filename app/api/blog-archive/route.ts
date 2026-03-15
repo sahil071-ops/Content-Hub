@@ -2,10 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { parse } from 'node-html-parser';
 import type { ArchivedBlogData } from '@/components/upload/blog-url-input';
 
-const FETCH_UAS = [
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-];
+/**
+ * Full browser-like headers including Sec-Fetch-* and Sec-Ch-Ua-* fingerprint headers.
+ * Unlike browser fetch (which strips Sec-* headers), Node.js fetch CAN send these.
+ * Cloudflare's bot detection checks for these — their absence is a strong bot signal.
+ */
+const BROWSER_FETCH_OPTIONS = {
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control': 'max-age=0',
+    'Upgrade-Insecure-Requests': '1',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
+    'Sec-Ch-Ua-Mobile': '?0',
+    'Sec-Ch-Ua-Platform': '"macOS"',
+  },
+};
 
 /** Derive a readable title from a URL slug when we can't fetch the page. */
 function titleFromUrl(parsedUrl: URL): string {
@@ -37,23 +55,18 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Try each UA in sequence — Cloudflare blocks Vercel IPs, but we try anyway
+    // Fetch with full browser fingerprint (Sec-* headers) — Node.js can send these, browsers can't
     let html: string | null = null;
     let lastStatus = 0;
 
-    for (const ua of FETCH_UAS) {
-      try {
-        const response = await fetch(url, {
-          headers: {
-            'User-Agent': ua,
-            Accept: 'text/html,application/xhtml+xml',
-            'Accept-Language': 'en-US,en;q=0.9',
-          },
-          signal: AbortSignal.timeout(15000),
-        });
-        lastStatus = response.status;
-        if (!response.ok) continue;
+    try {
+      const response = await fetch(url, {
+        ...BROWSER_FETCH_OPTIONS,
+        signal: AbortSignal.timeout(20000),
+      });
+      lastStatus = response.status;
 
+      if (response.ok) {
         const contentType = response.headers.get('content-type') || '';
         if (!contentType.includes('text/html') && !contentType.includes('text/plain')) {
           return NextResponse.json({
@@ -61,21 +74,19 @@ export async function POST(request: NextRequest) {
           }, { status: 422 });
         }
         html = await response.text();
-        break;
-      } catch (fetchErr) {
-        const message = fetchErr instanceof Error ? fetchErr.message : '';
-        if (message.includes('timeout') || message.includes('TimeoutError')) {
-          // Don't retry on timeout — it'll just time out again
-          return NextResponse.json({
-            error: 'The page took too long to respond (15s timeout). The site may be slow or blocking automated access.',
-          }, { status: 422 });
-        }
-        // Network error — try next UA
       }
+    } catch (fetchErr) {
+      const message = fetchErr instanceof Error ? fetchErr.message : '';
+      if (message.includes('timeout') || message.includes('TimeoutError')) {
+        return NextResponse.json({
+          error: 'The page took too long to respond (20s timeout). The site may be slow or blocking automated access.',
+        }, { status: 422 });
+      }
+      // Network error — fall through to partial archive
     }
 
-    // All UAs blocked (Cloudflare WAF by IP, etc.)
-    // Return a partial/link-only archive instead of an error so the user can still save the post.
+    // Site is blocking server-side fetches.
+    // Return a partial/link-only archive so the user can still save the post.
     if (html === null) {
       return NextResponse.json({
         url,
@@ -85,7 +96,7 @@ export async function POST(request: NextRequest) {
         text_content: '',
         archived_at: new Date().toISOString(),
         partial: true,
-        partial_reason: `The site returned HTTP ${lastStatus || 'error'} — it is blocking server-side access (e.g. Cloudflare WAF). The link has been saved but content could not be archived.`,
+        partial_reason: `HTTP ${lastStatus || 'error'} — site is blocking server access. Link saved; content not archived.`,
       });
     }
 

@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Globe, Loader2, AlertCircle, CheckCircle2, List } from 'lucide-react';
+import { Globe, Loader2, AlertCircle, CheckCircle2, List, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,8 @@ export function MassBlogImport({ productTags, topicTags }: MassBlogImportProps) 
   const [tab, setTab] = useState<'auto' | 'manual'>('auto');
   const [inputUrl, setInputUrl] = useState('');
   const [manualText, setManualText] = useState('');
+  const [csvFileName, setCsvFileName] = useState<string | null>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const [crawling, setCrawling] = useState(false);
   const [crawlError, setCrawlError] = useState<string | null>(null);
   const [crawlSource, setCrawlSource] = useState<string | null>(null);
@@ -39,16 +41,43 @@ export function MassBlogImport({ productTags, topicTags }: MassBlogImportProps) 
   const [importDone, setImportDone] = useState(false);
   const abortRef = useRef(false);
 
-  function handleManualLoad() {
-    const urls = manualText
-      .split(/[\n,]+/)
-      .map((s) => s.trim())
-      .filter((s) => s.startsWith('http'));
-    if (urls.length === 0) return;
+  /** Extract all http(s) URLs from any text (CSV, TSV, plain list, etc.) */
+  function extractUrlsFromText(text: string): string[] {
+    const seen = new Set<string>();
+    const urls: string[] = [];
+    // Match any http/https URL — works for CSV cells, tab-separated, plain lines
+    const re = /https?:\/\/[^\s,"'<>]+/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const u = m[0].replace(/[.,;)]+$/, ''); // strip trailing punctuation
+      if (!seen.has(u)) { seen.add(u); urls.push(u); }
+    }
+    return urls;
+  }
+
+  function loadUrls(urls: string[], source: string) {
+    if (urls.length === 0) { setCrawlError('No valid URLs found.'); return; }
     setCrawlError(null);
-    setCrawlSource('manual');
+    setCrawlSource(source);
     setImportDone(false);
     setUrlItems(urls.map((url) => ({ url, selected: true, status: 'idle' })));
+  }
+
+  function handleManualLoad() {
+    loadUrls(extractUrlsFromText(manualText), 'manual');
+  }
+
+  function handleCsvUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      loadUrls(extractUrlsFromText(text), 'csv');
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   }
 
   async function handleCrawl() {
@@ -241,29 +270,62 @@ export function MassBlogImport({ productTags, topicTags }: MassBlogImportProps) 
           )}
         </div>
       ) : (
-        /* Manual paste input */
-        <div className="space-y-2">
-          <Label>Paste Blog Post URLs</Label>
-          <Textarea
-            placeholder={"https://example.com/blog/post-1\nhttps://example.com/blog/post-2\nhttps://example.com/blog/post-3"}
-            value={manualText}
-            onChange={(e) => setManualText(e.target.value)}
-            rows={6}
-            className="font-mono text-xs"
-            disabled={importing}
-          />
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              One URL per line. Use this if auto-detect is blocked by Cloudflare.
-            </p>
-            <Button
+        /* Manual paste / CSV upload */
+        <div className="space-y-3">
+          {/* CSV upload */}
+          <div>
+            <input
+              ref={csvInputRef}
+              type="file"
+              accept=".csv,.tsv,.txt"
+              className="hidden"
+              onChange={handleCsvUpload}
+              disabled={importing}
+            />
+            <button
               type="button"
-              onClick={handleManualLoad}
-              disabled={!manualText.trim() || importing}
-              className="bg-[#2323A3] hover:bg-[#2323A3]/90 shrink-0"
+              onClick={() => csvInputRef.current?.click()}
+              disabled={importing}
+              className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/30 transition-colors py-4 text-sm text-muted-foreground"
             >
-              Load URLs
-            </Button>
+              <Upload className="h-4 w-4" />
+              {csvFileName
+                ? <span className="text-foreground font-medium">{csvFileName}</span>
+                : <span>Upload CSV / spreadsheet with blog URLs</span>
+              }
+            </button>
+            <p className="text-xs text-muted-foreground mt-1">
+              Any CSV or spreadsheet exported file — URLs are auto-detected from any column.
+            </p>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">or paste</span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Textarea
+              placeholder={"https://example.com/blog/post-1\nhttps://example.com/blog/post-2\nhttps://example.com/blog/post-3"}
+              value={manualText}
+              onChange={(e) => setManualText(e.target.value)}
+              rows={5}
+              className="font-mono text-xs"
+              disabled={importing}
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">One URL per line.</p>
+              <Button
+                type="button"
+                onClick={handleManualLoad}
+                disabled={!manualText.trim() || importing}
+                className="bg-[#2323A3] hover:bg-[#2323A3]/90 shrink-0"
+              >
+                Load URLs
+              </Button>
+            </div>
           </div>
         </div>
       )}
