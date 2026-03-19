@@ -1,0 +1,91 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { LayoutGrid, List } from 'lucide-react';
+import Link from 'next/link';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+// ── View Toggle ────────────────────────────────────────────────────────────
+
+export function ViewToggle() {
+  const searchParams = useSearchParams();
+  const current = searchParams.get('view') === 'list' ? 'list' : 'grid';
+
+  // On mount: restore persisted view if none in URL
+  useEffect(() => {
+    if (!searchParams.has('view')) {
+      try {
+        const stored = sessionStorage.getItem('library-view');
+        if (stored === 'list') {
+          const params = new URLSearchParams(searchParams.toString());
+          params.set('view', 'list');
+          // Replace without full navigation (shallow)
+          window.history.replaceState(null, '', `/library?${params.toString()}`);
+        }
+      } catch { /* sessionStorage may be unavailable */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function buildUrl(view: 'grid' | 'list') {
+    const params = new URLSearchParams(searchParams.toString());
+    if (view === 'grid') params.delete('view');
+    else params.set('view', 'list');
+    try { sessionStorage.setItem('library-view', view); } catch { /* ok */ }
+    const qs = params.toString();
+    return `/library${qs ? `?${qs}` : ''}`;
+  }
+
+  return (
+    <div className="flex rounded-md border overflow-hidden">
+      <Link
+        href={buildUrl('grid')}
+        className={`flex items-center px-3 py-2 transition-colors ${
+          current === 'grid' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+        }`}
+        aria-label="Grid view"
+      >
+        <LayoutGrid className="h-3.5 w-3.5" />
+      </Link>
+      <Link
+        href={buildUrl('list')}
+        className={`flex items-center px-3 py-2 transition-colors ${
+          current === 'list' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
+        }`}
+        aria-label="List view"
+      >
+        <List className="h-3.5 w-3.5" />
+      </Link>
+    </div>
+  );
+}
+
+// ── Sort Selector ──────────────────────────────────────────────────────────
+
+export function SortSelector() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const current = searchParams.get('sort') || 'newest';
+
+  function handleSort(value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'newest') params.delete('sort');
+    else params.set('sort', value);
+    router.push(`${pathname}?${params.toString()}`);
+  }
+
+  return (
+    <Select value={current} onValueChange={handleSort}>
+      <SelectTrigger className="w-40 h-9 text-xs">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="newest">Newest first</SelectItem>
+        <SelectItem value="oldest">Oldest first</SelectItem>
+        <SelectItem value="updated">Recently updated</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}

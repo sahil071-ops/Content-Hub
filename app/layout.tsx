@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/sonner';
 import { VersionUpdater } from '@/components/version-updater';
+import { ThemeProvider } from '@/components/layout/theme-provider';
 import { APP_NAME, VERSION } from '@/lib/version';
 
 export const metadata: Metadata = {
@@ -24,7 +25,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="app-version" content={VERSION} />
-        {/* Inter loaded via CSS for production — system font fallback during local dev */}
+        {/* Prevent flash of wrong theme on load */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');var d=t==='dark'||((!t||t==='system')&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.classList.add('dark');}catch(e){}})();` }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -33,9 +35,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
-        {children}
-        <Toaster position="bottom-right" richColors closeButton />
-        <VersionUpdater />
+        <ThemeProvider>
+          {children}
+          <Toaster position="bottom-right" richColors closeButton />
+          <VersionUpdater />
+        </ThemeProvider>
       </body>
     </html>
   );

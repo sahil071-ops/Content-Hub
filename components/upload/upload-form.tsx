@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -120,6 +120,26 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
   const isYouTube = contentType === 'video';
   const isVideo = isYouTube;
   const isBlog = contentType === 'blog';
+
+  // Track whether the form has unsaved content
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Mark dirty as soon as a file is added or youtube/blog data is loaded
+  useEffect(() => {
+    if (file || youtubeData || blogData || additionalFiles.length > 0) setIsDirty(true);
+  }, [file, youtubeData, blogData, additionalFiles.length]);
+
+  // Warn before closing tab with unsaved data
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty && !submitting) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty, submitting]);
 
   // ── Handlers ───────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { UserPlus, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { UserPlus, Loader2, AlertCircle, CheckCircle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -26,11 +27,11 @@ const ROLE_LABELS: Record<UserRoleEnum, string> = {
 };
 
 const ROLE_COLORS: Record<UserRoleEnum, string> = {
-  admin: 'bg-[#2323A3]/10 text-[#2323A3] border-[#2323A3]/20',
-  marketing: 'bg-purple-100 text-purple-700 border-purple-200',
-  sales: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  distributor: 'bg-amber-100 text-amber-700 border-amber-200',
-  viewer: 'bg-gray-100 text-gray-600 border-gray-200',
+  admin: 'bg-[#2323A3]/10 text-[#2323A3] border-[#2323A3]/20 dark:bg-[#2323A3]/20 dark:text-blue-300 dark:border-[#2323A3]/40',
+  marketing: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800',
+  sales: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800',
+  distributor: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
+  viewer: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
 };
 
 interface UsersManagerProps {
@@ -47,6 +48,8 @@ export function UsersManager({ users, currentUserId }: UsersManagerProps) {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSent, setInviteSent] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const supabase = createClient();
 
@@ -76,6 +79,29 @@ export function UsersManager({ users, currentUserId }: UsersManagerProps) {
       setInviteError(err.message || 'Network error. Please try again.');
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleDeleteUser(userId: string) {
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error('Failed to delete user', { description: json.error });
+      } else {
+        toast.success('User deleted');
+        startTransition(() => router.refresh());
+      }
+    } catch (err: any) {
+      toast.error('Failed to delete user', { description: err.message });
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmId(null);
     }
   }
 
@@ -121,6 +147,7 @@ export function UsersManager({ users, currentUserId }: UsersManagerProps) {
               <TableHead>Role</TableHead>
               <TableHead>Joined</TableHead>
               <TableHead className="text-right">Change Role</TableHead>
+            <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -181,6 +208,19 @@ export function UsersManager({ users, currentUserId }: UsersManagerProps) {
                         </SelectContent>
                       </Select>
                     </TableCell>
+                    <TableCell>
+                      {user.id !== currentUserId && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteConfirmId(user.id)}
+                          title="Delete user"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 );
               })
@@ -188,6 +228,28 @@ export function UsersManager({ users, currentUserId }: UsersManagerProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the user and revoke all access. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteConfirmId && handleDeleteUser(deleteConfirmId)}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete user'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Invite Dialog */}
       <Dialog open={inviteOpen} onOpenChange={(open) => !inviting && setInviteOpen(open)}>

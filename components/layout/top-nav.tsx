@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu, LogOut, User, Settings } from 'lucide-react';
+import { Menu, LogOut, Moon, Sun, Monitor } from 'lucide-react';
+import { useTheme } from '@/components/layout/theme-provider';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -25,6 +26,7 @@ interface TopNavProps {
 
 export function TopNav({ user }: TopNavProps) {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   async function handleSignOut() {
@@ -85,6 +87,16 @@ export function TopNav({ user }: TopNavProps) {
               <p className="text-xs leading-none text-muted-foreground capitalize">{user.role}</p>
             </div>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => setTheme('light')} className={theme === 'light' ? 'bg-accent' : ''}>
+            <Sun className="mr-2 h-4 w-4" /> Light
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setTheme('dark')} className={theme === 'dark' ? 'bg-accent' : ''}>
+            <Moon className="mr-2 h-4 w-4" /> Dark
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setTheme('system')} className={theme === 'system' ? 'bg-accent' : ''}>
+            <Monitor className="mr-2 h-4 w-4" /> System
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
             <LogOut className="mr-2 h-4 w-4" />
