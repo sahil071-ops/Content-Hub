@@ -59,7 +59,7 @@ export function AppShell({ user, healthIssues, children }: AppShellProps) {
           <SystemHealthBanner issues={healthIssues} />
         )}
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
           {children}
         </main>
 
