@@ -1,26 +1,27 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { LayoutGrid, List } from 'lucide-react';
 import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // ── View Toggle ────────────────────────────────────────────────────────────
 
-export function ViewToggle() {
-  const searchParams = useSearchParams();
-  const current = searchParams.get('view') === 'list' ? 'list' : 'grid';
+interface ViewToggleProps {
+  current: 'grid' | 'list';
+  searchParamsStr: string;
+}
 
+export function ViewToggle({ current, searchParamsStr }: ViewToggleProps) {
   // On mount: restore persisted view if none in URL
   useEffect(() => {
-    if (!searchParams.has('view')) {
+    const params = new URLSearchParams(searchParamsStr);
+    if (!params.has('view')) {
       try {
         const stored = sessionStorage.getItem('library-view');
         if (stored === 'list') {
-          const params = new URLSearchParams(searchParams.toString());
           params.set('view', 'list');
-          // Replace without full navigation (shallow)
           window.history.replaceState(null, '', `/library?${params.toString()}`);
         }
       } catch { /* sessionStorage may be unavailable */ }
@@ -29,7 +30,7 @@ export function ViewToggle() {
   }, []);
 
   function buildUrl(view: 'grid' | 'list') {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParamsStr);
     if (view === 'grid') params.delete('view');
     else params.set('view', 'list');
     try { sessionStorage.setItem('library-view', view); } catch { /* ok */ }
@@ -63,14 +64,17 @@ export function ViewToggle() {
 
 // ── Sort Selector ──────────────────────────────────────────────────────────
 
-export function SortSelector() {
-  const searchParams = useSearchParams();
+interface SortSelectorProps {
+  current: string;
+  searchParamsStr: string;
+}
+
+export function SortSelector({ current, searchParamsStr }: SortSelectorProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const current = searchParams.get('sort') || 'newest';
 
   function handleSort(value: string) {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParamsStr);
     if (value === 'newest') params.delete('sort');
     else params.set('sort', value);
     router.push(`${pathname}?${params.toString()}`);

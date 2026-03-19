@@ -118,6 +118,14 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
 
   const view = (searchParams.view === 'list' ? 'list' : 'grid') as 'grid' | 'list';
   const canUpload = ['admin', 'marketing'].includes(userRole);
+  const currentSort = searchParams.sort || 'newest';
+
+  // Serialize searchParams for client components (avoids useSearchParams() suspension)
+  const searchParamsStr = new URLSearchParams(
+    Object.entries(searchParams).flatMap(([k, v]) =>
+      Array.isArray(v) ? v.map((val) => [k, val]) : v ? [[k, v]] : []
+    )
+  ).toString();
 
   return (
     <div className="p-6">
@@ -130,14 +138,6 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
             {searchParams.q && ` matching "${searchParams.q}"`}
           </p>
         </div>
-        {canUpload && (
-          <Button asChild className="bg-[#2323A3] hover:bg-[#2323A3]/90">
-            <Link href="/upload">
-              <Upload className="h-4 w-4" />
-              Upload
-            </Link>
-          </Button>
-        )}
       </div>
 
       <div className="flex gap-6">
@@ -161,14 +161,20 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
 
             <div className="flex items-center gap-2 shrink-0">
               {/* Sort */}
-              <Suspense>
-                <SortSelector />
-              </Suspense>
+              <SortSelector current={currentSort} searchParamsStr={searchParamsStr} />
 
               {/* View toggle */}
-              <Suspense>
-                <ViewToggle />
-              </Suspense>
+              <ViewToggle current={view} searchParamsStr={searchParamsStr} />
+
+              {/* Upload button — always visible alongside controls */}
+              {canUpload && (
+                <Button asChild className="bg-[#2323A3] hover:bg-[#2323A3]/90">
+                  <Link href="/upload">
+                    <Upload className="h-4 w-4" />
+                    Upload
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
 
