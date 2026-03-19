@@ -59,7 +59,7 @@ export function ContentCard({ item, view = 'grid', contentTypesMap }: ContentCar
 
   if (view === 'list') {
     return (
-      <Link href={`/library/${item.id}`}>
+      <Link href={`/library/${item.id}`} className="block">
         <div className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors rounded-lg border bg-card">
           {/* Thumbnail or icon */}
           <div className="shrink-0 w-14 h-14 rounded-md overflow-hidden bg-muted flex items-center justify-center">
