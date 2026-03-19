@@ -3,11 +3,11 @@ import { createClient } from '@/lib/supabase/server';
 import { ContentGrid } from '@/components/content/content-grid';
 import { ContentFilters } from '@/components/content/content-filters';
 import { ContentSearch } from '@/components/content/content-search';
+import { ViewToggle, SortSelector } from '@/components/content/library-controls';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LayoutGrid, List, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import Link from 'next/link';
-import type { ContentItem, TagRow, UserRoleEnum, ContentTypeRow } from '@/types/database';
+import type { TagRow, UserRoleEnum, ContentTypeRow } from '@/types/database';
 import type { ContentTypesMap } from '@/components/content/content-card';
 import type { Metadata } from 'next';
 
@@ -162,12 +162,12 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
             <div className="flex items-center gap-2 shrink-0">
               {/* Sort */}
               <Suspense>
-                <SortSelector current={searchParams.sort} />
+                <SortSelector />
               </Suspense>
 
               {/* View toggle */}
               <Suspense>
-                <ViewToggle current={view} />
+                <ViewToggle />
               </Suspense>
             </div>
           </div>
@@ -186,42 +186,3 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   );
 }
 
-function SortSelector({ current }: { current?: string }) {
-  return (
-    <Select defaultValue={current || 'newest'}>
-      <SelectTrigger className="w-40 h-9 text-xs">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="newest">Newest first</SelectItem>
-        <SelectItem value="oldest">Oldest first</SelectItem>
-        <SelectItem value="updated">Recently updated</SelectItem>
-      </SelectContent>
-    </Select>
-  );
-}
-
-function ViewToggle({ current }: { current: 'grid' | 'list' }) {
-  return (
-    <div className="flex rounded-md border overflow-hidden">
-      <Link
-        href="?view=grid"
-        className={`flex items-center px-3 py-2 transition-colors ${
-          current === 'grid' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-        }`}
-        aria-label="Grid view"
-      >
-        <LayoutGrid className="h-3.5 w-3.5" />
-      </Link>
-      <Link
-        href="?view=list"
-        className={`flex items-center px-3 py-2 transition-colors ${
-          current === 'list' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-        }`}
-        aria-label="List view"
-      >
-        <List className="h-3.5 w-3.5" />
-      </Link>
-    </div>
-  );
-}
