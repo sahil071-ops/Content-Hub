@@ -92,12 +92,23 @@ CREATE TABLE IF NOT EXISTS dashboard_configs (
 CREATE INDEX IF NOT EXISTS dashboard_configs_user_idx      ON dashboard_configs (user_id);
 CREATE INDEX IF NOT EXISTS dashboard_configs_default_idx   ON dashboard_configs (is_default) WHERE is_default = TRUE;
 
+-- Ensure the updated_at trigger function exists (may not exist in all environments)
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
 -- Auto-update updated_at
-CREATE OR REPLACE TRIGGER set_content_targets_updated_at
+DROP TRIGGER IF EXISTS set_content_targets_updated_at ON content_targets;
+CREATE TRIGGER set_content_targets_updated_at
   BEFORE UPDATE ON content_targets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE OR REPLACE TRIGGER set_dashboard_configs_updated_at
+DROP TRIGGER IF EXISTS set_dashboard_configs_updated_at ON dashboard_configs;
+CREATE TRIGGER set_dashboard_configs_updated_at
   BEFORE UPDATE ON dashboard_configs
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

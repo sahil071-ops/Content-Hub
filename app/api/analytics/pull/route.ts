@@ -154,6 +154,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Pull failed' }, { status: 500 });
   }
 }
-
-// Export for cron routes to use
-export { runPull };
