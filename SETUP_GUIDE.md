@@ -428,4 +428,179 @@ NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
 
 ---
 
-*Document version: v0.1.0 | Last updated: 2026-03-11*
+## Phase 2 Addendum — Analytics Setup
+
+### Phase 2 new environment variables
+
+Add these to your Vercel project environment variables (Settings → Environment Variables):
+
+```
+# Google (used for GA4, Search Console, YouTube Analytics)
+GOOGLE_SERVICE_ACCOUNT_EMAIL=your-service-account@your-project.iam.gserviceaccount.com
+GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+
+# GA4 Property IDs (the number after "properties/" in your GA4 URL)
+GA4_PROPERTY_ID_MAIN=123456789
+GA4_PROPERTY_ID_ES=987654321
+
+# Search Console site URLs (must match exactly as verified in GSC)
+GSC_SITE_URL_MAIN=https://your-main-site.com/
+GSC_SITE_URL_ES=https://your-main-site.com/es/
+
+# YouTube
+YOUTUBE_API_KEY=AIza...
+YOUTUBE_CHANNEL_ID=UC...
+
+# Brevo
+BREVO_API_KEY=xkeysib-...
+
+# Anthropic (for AI Highlights)
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Cron security (generate any random string, e.g. openssl rand -hex 32)
+CRON_SECRET=your-random-secret-here
+```
+
+---
+
+### Step A — Create a Google Service Account
+
+A Service Account is like a robot user that can read your analytics data without needing a human to log in.
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Create a new project (or use an existing one)
+3. Enable these three APIs for your project:
+   - **Google Analytics Data API** (for GA4)
+   - **Google Search Console API**
+   - **YouTube Analytics API**
+
+   To enable each: search for the API name in the search bar → click it → click **Enable**
+
+4. In the left menu go to **IAM & Admin → Service Accounts**
+5. Click **Create Service Account**
+6. Name it `axis-content-hub` and click **Create and Continue**
+7. Skip the optional role step — click **Done**
+8. Click on the service account you just created
+9. Go to the **Keys** tab → **Add Key → Create new key → JSON** → **Create**
+10. A JSON file downloads. Open it and copy:
+    - `client_email` → this is your `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+    - `private_key` → this is your `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` (include the full string with `\n` newlines)
+
+> **Important for Vercel**: When pasting the private key into Vercel's environment variables, paste it exactly as it appears in the JSON file — including the literal `\n` characters. Do NOT replace them with real newlines in the Vercel UI.
+
+---
+
+### Step B — Grant the Service Account access to GA4
+
+1. Go to [analytics.google.com](https://analytics.google.com)
+2. Click the gear icon (⚙) at the bottom left → **Account Access Management**
+3. Click the **+** button to add a user
+4. Enter the service account email (e.g. `axis-content-hub@your-project.iam.gserviceaccount.com`)
+5. Set role to **Viewer** → **Add**
+6. Repeat for each GA4 property you want to track
+
+**Finding your GA4 Property ID:**
+1. In GA4, go to Admin (gear icon) → Property Settings
+2. Your Property ID is shown at the top (e.g. `123456789`)
+3. Copy this number into `GA4_PROPERTY_ID_MAIN` (and `GA4_PROPERTY_ID_ES` for the Spanish site)
+
+---
+
+### Step C — Grant the Service Account access to Search Console
+
+1. Go to [search.google.com/search-console](https://search.google.com/search-console)
+2. Select your property (website)
+3. In the left menu click **Settings → Users and permissions**
+4. Click **Add User**
+5. Enter the service account email
+6. Set permission to **Full** → **Add**
+
+**Finding your GSC site URL:**
+- The exact URL is shown in the top-left property dropdown in Search Console
+- Common formats: `https://yourdomain.com/` (with trailing slash) or `sc-domain:yourdomain.com`
+- Copy it exactly — even a missing trailing slash will cause errors
+- Set this as `GSC_SITE_URL_MAIN`
+
+---
+
+### Step D — Set up YouTube Analytics API
+
+The YouTube Analytics API uses the same Google Service Account you already created, but it needs to be linked to your YouTube channel.
+
+**Getting your YouTube Channel ID:**
+1. Go to [youtube.com](https://youtube.com) and sign in as your channel
+2. Click your profile → **YouTube Studio**
+3. In the left menu click **Settings → Channel → Advanced settings**
+4. Your **Channel ID** starts with `UC...` — copy it into `YOUTUBE_CHANNEL_ID`
+
+**YouTube API Key:**
+1. Go back to [console.cloud.google.com](https://console.cloud.google.com)
+2. Go to **APIs & Services → Credentials**
+3. Click **Create Credentials → API Key**
+4. Copy the key into `YOUTUBE_API_KEY`
+5. (Optional but recommended) Click **Edit** on the key → restrict it to the YouTube Data API v3
+
+**Note:** YouTube Analytics API requires the service account to be linked as a channel manager. Go to [studio.youtube.com](https://studio.youtube.com) → **Settings → Permissions → Invite** and add the service account email as a Manager.
+
+---
+
+### Step E — Get your Brevo API Key
+
+1. Log in to [app.brevo.com](https://app.brevo.com)
+2. Click your name in the top right → **SMTP & API**
+3. Go to the **API Keys** tab
+4. Click **Create a new API key** → name it `Axis Content Hub`
+5. Copy the key that appears (it starts with `xkeysib-`) into `BREVO_API_KEY`
+
+---
+
+### Step F — Set up Vercel Cron Jobs
+
+The `vercel.json` file in the project root already configures the cron schedules. When you deploy to Vercel, these run automatically:
+
+| Cron | Schedule | What it does |
+|------|----------|-------------|
+| Weekly | Every Monday 6:00 AM IST | Pulls last week's data |
+| Monthly | 1st of month 6:00 AM IST | Pulls last month's data |
+| Quarterly | 1st of Jan/Apr/Jul/Oct 6:00 AM IST | Pulls last quarter's data |
+| Annual | 1st of January 6:00 AM IST | Pulls last year's data |
+
+> Note: Vercel Cron Jobs require a Pro plan ($20/month) or higher. On the free Hobby plan, crons are not available — you can use the **Pull data now** button in the dashboard instead.
+
+**Setting the CRON_SECRET:**
+1. Generate a random string: run `openssl rand -hex 32` in your terminal (or use any password generator)
+2. Add it as `CRON_SECRET` in Vercel environment variables
+3. Vercel automatically sends this as an `Authorization: Bearer {secret}` header with cron requests
+
+---
+
+### Step G — Run the database migration
+
+After deploying the new code, run migration `006_analytics.sql` in your Supabase SQL editor:
+
+1. Open [supabase.com](https://supabase.com) → your project → **SQL Editor**
+2. Click **New query**
+3. Copy the contents of `supabase/migrations/006_analytics.sql` and paste them
+4. Click **Run**
+
+This creates the new tables: `mis_snapshots`, `mis_pull_logs`, `mis_highlights`, `content_targets`, and `dashboard_configs`.
+
+---
+
+### Step H — Verify everything works
+
+1. Deploy your updated code to Vercel
+2. Log in as an admin user
+3. Navigate to **Analytics → MIS Dashboard**
+4. Click **Pull data now** to run a manual pull
+5. Watch the toast notification — it should say "Data pull complete — X sources updated"
+6. Refresh the page to see your data
+
+If the pull fails:
+- Check Vercel function logs (Vercel dashboard → Deployments → Functions tab)
+- Verify all environment variables are set correctly
+- Make sure the service account has been granted access to each property
+
+---
+
+*Document version: v0.2.0 | Last updated: 2026-03-20*

@@ -1,0 +1,20 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/mis?period=weekly",
+      "schedule": "30 0 * * 1"
+    },
+    {
+      "path": "/api/cron/mis?period=monthly",
+      "schedule": "30 0 1 * *"
+    },
+    {
+      "path": "/api/cron/mis?period=quarterly",
+      "schedule": "30 0 1 1,4,7,10 *"
+    },
+    {
+      "path": "/api/cron/mis?period=annual",
+      "schedule": "30 0 1 1 *"
+    }
+  ]
+}

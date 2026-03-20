@@ -13,6 +13,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LayoutGrid,
+  BarChart2,
+  TrendingUp,
+  History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -38,6 +41,27 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Upload Content',
     href: '/upload',
     icon: Upload,
+    roles: ['admin', 'marketing'],
+  },
+];
+
+const ANALYTICS_NAV_ITEMS: NavItem[] = [
+  {
+    label: 'Content Analytics',
+    href: '/analytics/content',
+    icon: BarChart2,
+    roles: ['admin', 'marketing', 'sales'],
+  },
+  {
+    label: 'MIS Dashboard',
+    href: '/analytics/mis',
+    icon: TrendingUp,
+    roles: ['admin', 'marketing'],
+  },
+  {
+    label: 'Pull History',
+    href: '/analytics/mis/history',
+    icon: History,
     roles: ['admin', 'marketing'],
   },
 ];
@@ -80,6 +104,7 @@ export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCo
   const pathname = usePathname();
 
   const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(userRole));
+  const visibleAnalytics = ANALYTICS_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleAdmin = ADMIN_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
 
   function NavLink({ item }: { item: NavItem }) {
@@ -143,6 +168,25 @@ export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCo
               <NavLink key={item.href} item={item} />
             ))}
           </nav>
+
+          {/* Analytics section */}
+          {visibleAnalytics.length > 0 && (
+            <>
+              <Separator className="my-4 bg-white/10" />
+              {!collapsed && (
+                <div className="px-3 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-white/30">
+                    Analytics
+                  </span>
+                </div>
+              )}
+              <nav className="space-y-1">
+                {visibleAnalytics.map((item) => (
+                  <NavLink key={item.href} item={item} />
+                ))}
+              </nav>
+            </>
+          )}
 
           {/* Admin section */}
           {visibleAdmin.length > 0 && (
