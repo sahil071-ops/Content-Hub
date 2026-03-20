@@ -155,7 +155,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
         <div className="flex-1 min-w-0">
           {/* Search + controls bar */}
           <div className="flex flex-col sm:flex-row gap-3 mb-4">
-            <Suspense>
+            <Suspense fallback={<div className="flex-1 h-9 rounded-md border bg-muted/50 animate-pulse" />}>
               <ContentSearch className="flex-1" />
             </Suspense>
 
