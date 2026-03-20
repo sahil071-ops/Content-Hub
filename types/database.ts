@@ -192,6 +192,146 @@ export interface UploadCompleteRequest {
   meta?: ContentMeta;
 }
 
+// ── Analytics / MIS types (Phase 2) ────────────────────────────
+
+export type MisSourceEnum = 'ga4' | 'search_console' | 'youtube' | 'brevo';
+export type MisPeriodTypeEnum = 'weekly' | 'monthly' | 'quarterly' | 'annual';
+export type MisPullStatusEnum = 'success' | 'failed' | 'partial';
+
+export interface MisSnapshot {
+  id: string;
+  source: MisSourceEnum;
+  property: string;
+  period_type: MisPeriodTypeEnum;
+  period_start: string;
+  period_end: string;
+  data: Record<string, unknown>;
+  pulled_at: string;
+  created_at: string;
+}
+
+export interface MisPullLog {
+  id: string;
+  source: MisSourceEnum;
+  period_type: MisPeriodTypeEnum;
+  status: MisPullStatusEnum;
+  pulled_at: string;
+  error_message: string | null;
+}
+
+export interface MisHighlight {
+  id: string;
+  period_start: string;
+  period_end: string;
+  period_type: MisPeriodTypeEnum;
+  highlights: HighlightItem[];
+  feedback: Record<string, 'up' | 'down'>;
+  created_at: string;
+}
+
+export interface HighlightItem {
+  id: string;
+  source: MisSourceEnum;
+  text: string;
+  sentiment: 'positive' | 'warning' | 'anomaly';
+}
+
+export interface ContentTarget {
+  id: string;
+  tag_name: string;
+  tag_type: string;
+  target_percentage: number;
+  set_by: string | null;
+  updated_at: string;
+}
+
+export interface DashboardConfig {
+  id: string;
+  user_id: string | null;
+  dashboard_name: string;
+  config: DashboardConfigData;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DashboardConfigData {
+  widgets: WidgetConfig[];
+}
+
+export interface WidgetConfig {
+  id: string;
+  visible: boolean;
+  order: number;
+}
+
+// GA4 snapshot data shape
+export interface GA4SnapshotData {
+  organic_sessions: number;
+  organic_sessions_prev: number;
+  new_users: number;
+  returning_users: number;
+  bounce_rate: number;
+  top_countries: { country: string; sessions: number }[];
+  timeline: { date: string; sessions: number }[];
+}
+
+// Search Console snapshot data shape
+export interface GscSnapshotData {
+  clicks: number;
+  clicks_prev: number;
+  impressions: number;
+  impressions_prev: number;
+  ctr: number;
+  position: number;
+  top_queries: { query: string; clicks: number; impressions: number; ctr: number; position: number }[];
+  top_pages: { page: string; clicks: number; impressions: number }[];
+  india?: {
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+    top_queries: { query: string; clicks: number }[];
+  };
+}
+
+// YouTube snapshot data shape
+export interface YoutubeSnapshotData {
+  views: number;
+  views_prev: number;
+  watch_time_minutes: number;
+  watch_time_prev: number;
+  subscribers_gained: number;
+  subscribers_lost: number;
+  net_subscribers: number;
+  top_videos: {
+    video_id: string;
+    title: string;
+    thumbnail: string;
+    views: number;
+    watch_time_minutes: number;
+  }[];
+  timeline: { date: string; views: number }[];
+}
+
+// Brevo snapshot data shape
+export interface BrevoSnapshotData {
+  campaigns: {
+    id: string;
+    name: string;
+    send_date: string;
+    sent_count: number;
+    open_rate: number;
+    click_rate: number;
+    ctor: number;
+    unsubscribe_count: number;
+    unsubscribe_rate: number;
+  }[];
+  avg_open_rate: number;
+  avg_click_rate: number;
+  avg_ctor: number;
+}
+
 // ── Supabase Database generic type ─────────────────────────────
 
 export interface Database {
