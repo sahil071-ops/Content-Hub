@@ -34,9 +34,27 @@ export function DashboardControls({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      toast.success(`Data pull complete — ${data.results} source${data.results !== 1 ? 's' : ''} updated`);
-      // Refresh the page to show new data
-      setTimeout(() => window.location.reload(), 800);
+
+      const { results, failed, skipped, logs } = data as {
+        results: number;
+        failed: number;
+        skipped: number;
+        logs: { source: string; property: string; status: string; error?: string }[];
+      };
+
+      if (results > 0) {
+        toast.success(`Data pull complete — ${results} source${results !== 1 ? 's' : ''} updated`);
+      } else if (failed > 0) {
+        const errors = logs.filter((l) => l.status === 'failed').map((l) => `${l.source}/${l.property}: ${l.error}`);
+        toast.error(`Pull failed for all sources. First error: ${errors[0] || 'Unknown'}`);
+        console.error('Pull errors:', errors);
+      } else {
+        const missingEnvs = logs.filter((l) => l.status === 'skipped').map((l) => l.error).join(' | ');
+        toast.warning(`No sources configured. Add env vars in Vercel: ${missingEnvs}`);
+        console.warn('Skipped sources:', logs.filter((l) => l.status === 'skipped'));
+      }
+
+      if (results > 0) setTimeout(() => window.location.reload(), 800);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Pull failed');
     } finally {
