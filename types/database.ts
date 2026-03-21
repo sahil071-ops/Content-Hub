@@ -192,6 +192,80 @@ export interface UploadCompleteRequest {
   meta?: ContentMeta;
 }
 
+// ── LinkedIn Performance Tracker types (Phase 3) ───────────────
+
+export type LinkedInAccountType = 'personal' | 'company';
+export type LinkedInPostFormat = 'text' | 'image' | 'video' | 'carousel' | 'document' | 'poll' | 'other';
+export type LinkedInExtractionStatus = 'manual' | 'ai_extracted' | 'ai_partial' | 'pending';
+export type LinkedInInsightType = 'pattern' | 'recommendation' | 'anomaly' | 'summary';
+export type LinkedInPostStatus = 'draft' | 'published';
+
+export interface LinkedInAccount {
+  id: string;
+  name: string;
+  account_type: LinkedInAccountType;
+  profile_url: string | null;
+  avatar_url: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface LinkedInPost {
+  id: string;
+  account_id: string;
+  post_url: string | null;
+  post_date: string;
+  post_text: string | null;
+  post_format: LinkedInPostFormat;
+  status: LinkedInPostStatus;
+  topic_tags: string[];
+  product_tags: string[];
+  impressions: number | null;
+  reactions: number | null;
+  comments: number | null;
+  shares: number | null;
+  profile_visits: number | null;
+  follows_gained: number | null;
+  link_clicks: number | null;
+  engagement_rate: number | null;
+  screenshot_url: string | null;
+  extraction_status: LinkedInExtractionStatus;
+  extraction_notes: string | null;
+  linked_content_id: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  account?: LinkedInAccount;
+  linked_content?: { id: string; title: string; content_type: string; thumbnail_url: string | null };
+}
+
+export interface LinkedInAiInsight {
+  id: string;
+  generated_at: string;
+  period_start: string | null;
+  period_end: string | null;
+  account_id: string | null;
+  insight_type: LinkedInInsightType;
+  content: string;
+  supporting_post_ids: string[];
+  thumbs_up: boolean | null;
+  run_id: string;
+  created_at: string;
+}
+
+// Extracted metrics from screenshot via Claude Vision
+export interface LinkedInExtractedMetrics {
+  impressions: number | null;
+  reactions: number | null;
+  comments: number | null;
+  shares: number | null;
+  profile_visits: number | null;
+  follows_gained: number | null;
+  link_clicks: number | null;
+  post_date: string | null;
+}
+
 // ── Analytics / MIS types (Phase 2) ────────────────────────────
 
 export type MisSourceEnum = 'ga4' | 'search_console' | 'youtube' | 'brevo';

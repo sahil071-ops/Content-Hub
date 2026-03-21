@@ -16,6 +16,10 @@ import {
   BarChart2,
   TrendingUp,
   History,
+  Linkedin,
+  PlusSquare,
+  LayoutDashboard,
+  Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -66,6 +70,33 @@ const ANALYTICS_NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const LINKEDIN_NAV_ITEMS: NavItem[] = [
+  {
+    label: 'Post Library',
+    href: '/linkedin',
+    icon: Linkedin,
+    roles: ['admin', 'marketing', 'sales'],
+  },
+  {
+    label: 'Add Post',
+    href: '/linkedin/add',
+    icon: PlusSquare,
+    roles: ['admin', 'marketing'],
+  },
+  {
+    label: 'Dashboard',
+    href: '/linkedin/dashboard',
+    icon: LayoutDashboard,
+    roles: ['admin', 'marketing', 'sales'],
+  },
+  {
+    label: 'AI Insights',
+    href: '/linkedin/insights',
+    icon: Sparkles,
+    roles: ['admin', 'marketing', 'sales'],
+  },
+];
+
 const ADMIN_NAV_ITEMS: NavItem[] = [
   {
     label: 'Tag Management',
@@ -91,6 +122,12 @@ const ADMIN_NAV_ITEMS: NavItem[] = [
     icon: HardDrive,
     roles: ['admin'],
   },
+  {
+    label: 'LinkedIn Accounts',
+    href: '/admin/linkedin',
+    icon: Linkedin,
+    roles: ['admin'],
+  },
 ];
 
 interface AppSidebarProps {
@@ -105,6 +142,7 @@ export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCo
 
   const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleAnalytics = ANALYTICS_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
+  const visibleLinkedIn = LINKEDIN_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleAdmin = ADMIN_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
 
   function NavLink({ item }: { item: NavItem }) {
@@ -182,6 +220,25 @@ export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCo
               )}
               <nav className="space-y-1">
                 {visibleAnalytics.map((item) => (
+                  <NavLink key={item.href} item={item} />
+                ))}
+              </nav>
+            </>
+          )}
+
+          {/* LinkedIn section */}
+          {visibleLinkedIn.length > 0 && (
+            <>
+              <Separator className="my-4 bg-white/10" />
+              {!collapsed && (
+                <div className="px-3 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-white/30">
+                    LinkedIn
+                  </span>
+                </div>
+              )}
+              <nav className="space-y-1">
+                {visibleLinkedIn.map((item) => (
                   <NavLink key={item.href} item={item} />
                 ))}
               </nav>
