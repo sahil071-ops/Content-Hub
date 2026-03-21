@@ -48,7 +48,8 @@ export async function fetchYouTubeData(
   const stats = channelJson.items[0].statistics;
   const uploadsPlaylistId = channelJson.items[0].contentDetails.relatedPlaylists.uploads;
 
-  const totalViews = parseInt(stats.viewCount || '0', 10);
+  const totalChannelViews = parseInt(stats.viewCount || '0', 10);
+  const subscriberCount = parseInt(stats.subscriberCount || '0', 10);
 
   // ── Latest videos from uploads playlist ───────────────────
   let top_videos: YoutubeSnapshotData['top_videos'] = [];
@@ -98,16 +99,16 @@ export async function fetchYouTubeData(
   const periodViews = top_videos.reduce((sum, v) => sum + v.views, 0);
 
   return {
+    // views = recent uploads' views; views_prev = total channel lifetime views (for context)
     views: periodViews,
-    views_prev: 0, // Not available without YouTube Analytics OAuth
-    watch_time_minutes: 0,
+    views_prev: totalChannelViews,
+    watch_time_minutes: 0,     // Requires YouTube Analytics OAuth — not available via API key
     watch_time_prev: 0,
-    subscribers_gained: 0,
+    // subscribers_gained = current total subscriber count (per-period gain needs Analytics OAuth)
+    subscribers_gained: subscriberCount,
     subscribers_lost: 0,
-    net_subscribers: 0,
+    net_subscribers: subscriberCount,
     top_videos,
-    timeline: [], // Time-series requires YouTube Analytics OAuth — not available via API key
-    // Extra channel-level totals stored for context
-    ...(totalViews && { channel_total_views: totalViews }),
+    timeline: [],              // Requires YouTube Analytics OAuth — not available via API key
   } as YoutubeSnapshotData;
 }

@@ -12,11 +12,10 @@ export function YouTubeSection({ data }: YouTubeSectionProps) {
   return (
     <div className="space-y-5 pt-4">
       {/* Metrics row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <MetricCard label="Views" value={data.views} prev={data.views_prev} />
-        <MetricCard label="Net Subscribers" value={data.net_subscribers} />
-        <MetricCard label="Watch Time" value={Math.round(data.watch_time_minutes / 60)} prev={Math.round(data.watch_time_prev / 60)} unit="hrs" />
-        <MetricCard label="Subs Gained" value={data.subscribers_gained} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <MetricCard label="Recent Video Views" value={data.views} />
+        <MetricCard label="Channel Total Views" value={data.views_prev} />
+        <MetricCard label="Subscribers" value={data.net_subscribers} />
       </div>
 
       {/* Views timeline */}
