@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import Anthropic from '@anthropic-ai/sdk';
 import type { LinkedInPost, LinkedInAccount, LinkedInInsightType } from '@/types/database';
-import { v4 as uuidv4 } from 'uuid';
 
 export const maxDuration = 120;
 
@@ -131,7 +130,7 @@ Return ONLY a valid JSON array. No text outside the array.`;
     try { parsed = JSON.parse(raw); }
     catch { return NextResponse.json({ error: 'AI returned invalid JSON' }, { status: 500 }); }
 
-    const run_id = uuidv4();
+    const run_id = crypto.randomUUID();
     const inserts = parsed.map((item: any) => ({
       run_id,
       account_id: account_id || null,
