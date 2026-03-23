@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, FileText, Plus, Trash2, Loader2, Camera, Edit3, ChevronDown, ChevronUp } from 'lucide-react';
+import { Upload, FileText, Plus, Trash2, Loader2, Camera, Edit3, ChevronDown, ChevronUp, Table2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -83,6 +83,60 @@ export default function LinkedInAddPage() {
 
   // ── Mode A handlers ─────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const xlsxInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleXlsxUpload(file: File) {
+    setModeARow(r => ({ ...r, extracting: true }));
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/linkedin/parse-xlsx', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Failed to parse XLSX');
+      const { metrics, demographics } = await res.json() as {
+        metrics: {
+          post_url: string | null;
+          post_date: string | null;
+          impressions: number | null;
+          reactions: number | null;
+          comments: number | null;
+          shares: number | null;
+          profile_visits: number | null;
+          follows_gained: number | null;
+          members_reached: number | null;
+          saves: number | null;
+          sends: number | null;
+        };
+        demographics: { category: string; value: string; pct: string }[];
+      };
+
+      const extraNotes = [
+        metrics.members_reached != null && `Members reached: ${metrics.members_reached}`,
+        metrics.saves != null && `Saves: ${metrics.saves}`,
+        metrics.sends != null && `Sends: ${metrics.sends}`,
+        demographics.length > 0 && `Top demographics: ${demographics.slice(0, 5).map(d => `${d.category} — ${d.value} (${d.pct})`).join(', ')}`,
+      ].filter(Boolean).join('\n');
+
+      setModeARow(r => ({
+        ...r,
+        extracting: false,
+        extracted: true,
+        post_url:      metrics.post_url ?? r.post_url,
+        post_date:     metrics.post_date ?? r.post_date,
+        impressions:   metrics.impressions?.toString() ?? r.impressions,
+        reactions:     metrics.reactions?.toString() ?? r.reactions,
+        comments:      metrics.comments?.toString() ?? r.comments,
+        shares:        metrics.shares?.toString() ?? r.shares,
+        profile_visits: metrics.profile_visits?.toString() ?? r.profile_visits,
+        follows_gained: metrics.follows_gained?.toString() ?? r.follows_gained,
+      }));
+
+      toast.success(`Metrics loaded from XLSX${extraNotes ? ' — extra data in notes' : ''}`);
+      if (extraNotes) console.info('LinkedIn XLSX extra data:', extraNotes);
+    } catch (e) {
+      setModeARow(r => ({ ...r, extracting: false }));
+      toast.error('Could not read XLSX file');
+    }
+  }
 
   async function handleScreenshotUpload(file: File) {
     setModeARow(r => ({ ...r, screenshot_file: file, screenshot_preview: URL.createObjectURL(file), extracting: true }));
@@ -249,15 +303,15 @@ export default function LinkedInAddPage() {
       <div>
         <h1 className="text-2xl font-bold">Add LinkedIn Post</h1>
         <p className="text-sm text-muted-foreground">
-          Use Mode A to extract metrics from a screenshot, or Mode B for manual bulk entry.
+          Mode A: import from LinkedIn's PostAnalytics XLSX or a screenshot. Mode B: manual bulk entry.
         </p>
       </div>
 
       <Tabs defaultValue="mode-a">
         <TabsList>
           <TabsTrigger value="mode-a" className="gap-2">
-            <Camera className="h-4 w-4" />
-            Mode A — Screenshot
+            <Upload className="h-4 w-4" />
+            Mode A — Import
           </TabsTrigger>
           <TabsTrigger value="mode-b" className="gap-2">
             <Edit3 className="h-4 w-4" />
@@ -269,12 +323,59 @@ export default function LinkedInAddPage() {
         <TabsContent value="mode-a" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle>Screenshot Extraction</CardTitle>
+              <CardTitle>Import from LinkedIn</CardTitle>
               <CardDescription>
-                Upload a LinkedIn Analytics screenshot and Claude Vision will extract the metrics automatically.
+                Upload the LinkedIn PostAnalytics XLSX export for exact numbers, or upload a screenshot for Claude Vision extraction.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
+
+              {/* ── XLSX / screenshot import strip ── */}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 gap-2 h-10 border-dashed"
+                  onClick={() => xlsxInputRef.current?.click()}
+                  disabled={modeARow.extracting}
+                >
+                  {modeARow.extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Table2 className="h-4 w-4 text-emerald-600" />}
+                  <span className="text-sm">Upload PostAnalytics XLSX</span>
+                  {modeARow.extracted && <Badge className="bg-emerald-600 text-xs ml-auto">Loaded</Badge>}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 gap-2 h-10 border-dashed"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={modeARow.extracting}
+                >
+                  {modeARow.extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4 text-blue-600" />}
+                  <span className="text-sm">Upload Screenshot</span>
+                  {modeARow.screenshot_preview && !modeARow.extracted && <Badge variant="outline" className="text-xs ml-auto">Ready</Badge>}
+                </Button>
+                <input ref={xlsxInputRef} type="file" accept=".xlsx,.xls" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleXlsxUpload(f); e.target.value = ''; }} />
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleScreenshotUpload(f); }} />
+              </div>
+
+              {/* Screenshot preview (shown after screenshot upload) */}
+              {modeARow.screenshot_preview && (
+                <div className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={modeARow.screenshot_preview} alt="Screenshot preview"
+                    className="w-full max-h-48 object-contain rounded-md border" />
+                  {modeARow.extracting && (
+                    <div className="absolute inset-0 bg-background/70 flex items-center justify-center rounded-md">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin" />Extracting…
+                      </div>
+                    </div>
+                  )}
+                  {modeARow.extracted && <Badge className="absolute top-2 right-2 bg-emerald-600">AI Extracted</Badge>}
+                </div>
+              )}
               {/* Account + date + format */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
@@ -315,62 +416,6 @@ export default function LinkedInAddPage() {
                 />
               </div>
 
-              {/* Screenshot upload */}
-              <div className="space-y-2">
-                <Label>Analytics Screenshot</Label>
-                {modeARow.screenshot_preview ? (
-                  <div className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={modeARow.screenshot_preview}
-                      alt="Screenshot preview"
-                      className="w-full max-h-64 object-contain rounded-md border"
-                    />
-                    {modeARow.extracting && (
-                      <div className="absolute inset-0 bg-background/70 flex items-center justify-center rounded-md">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          Extracting metrics…
-                        </div>
-                      </div>
-                    )}
-                    {modeARow.extracted && (
-                      <Badge className="absolute top-2 right-2 bg-emerald-600">AI Extracted</Badge>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="absolute bottom-2 right-2"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Replace
-                    </Button>
-                  </div>
-                ) : (
-                  <div
-                    className="border-2 border-dashed rounded-md p-8 text-center cursor-pointer hover:bg-muted/20 transition-colors"
-                    onClick={() => fileInputRef.current?.click()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const file = e.dataTransfer.files[0];
-                      if (file?.type.startsWith('image/')) handleScreenshotUpload(file);
-                    }}
-                    onDragOver={(e) => e.preventDefault()}
-                  >
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Drop a screenshot here or click to browse
-                    </p>
-                  </div>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleScreenshotUpload(f); }}
-                />
-              </div>
 
               {/* Extracted / manual metrics */}
               <div>
