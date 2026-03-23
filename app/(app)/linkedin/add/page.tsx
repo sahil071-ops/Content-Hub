@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Upload, FileText, Plus, Trash2, Loader2, Camera, Edit3, ChevronDown, ChevronUp, Table2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { TagInput } from '@/components/ui/tag-input';
 import { toast } from 'sonner';
 import type { LinkedInAccount, LinkedInPostFormat, LinkedInExtractedMetrics } from '@/types/database';
-import { useEffect } from 'react';
 
 const FORMAT_OPTIONS: LinkedInPostFormat[] = ['text', 'image', 'video', 'carousel', 'document', 'poll', 'other'];
 
@@ -31,12 +31,13 @@ interface PostRow {
   profile_visits: string;
   follows_gained: string;
   link_clicks: string;
-  topic_tags: string;
-  product_tags: string;
+  topic_tags: string[];
+  product_tags: string[];
   screenshot_file?: File;
   screenshot_preview?: string;
   extracting?: boolean;
   extracted?: boolean;
+  extraction_status?: 'manual' | 'ai_extracted' | 'ai_partial';
   expanded?: boolean;
 }
 
@@ -55,9 +56,32 @@ function emptyRow(): PostRow {
     profile_visits: '',
     follows_gained: '',
     link_clicks: '',
-    topic_tags: '',
-    product_tags: '',
+    topic_tags: [],
+    product_tags: [],
+    extraction_status: 'manual',
     expanded: true,
+  };
+}
+
+function rowToPayload(r: PostRow, overrides: Partial<PostRow> = {}) {
+  const merged = { ...r, ...overrides };
+  return {
+    account_id: merged.account_id,
+    post_url: merged.post_url || null,
+    post_date: merged.post_date,
+    post_text: merged.post_text || null,
+    post_format: merged.post_format,
+    status: 'published',
+    impressions: merged.impressions ? parseInt(merged.impressions) : null,
+    reactions: merged.reactions ? parseInt(merged.reactions) : null,
+    comments: merged.comments ? parseInt(merged.comments) : null,
+    shares: merged.shares ? parseInt(merged.shares) : null,
+    profile_visits: merged.profile_visits ? parseInt(merged.profile_visits) : null,
+    follows_gained: merged.follows_gained ? parseInt(merged.follows_gained) : null,
+    link_clicks: merged.link_clicks ? parseInt(merged.link_clicks) : null,
+    topic_tags: merged.topic_tags,
+    product_tags: merged.product_tags,
+    extraction_status: merged.extraction_status ?? 'manual',
   };
 }
 
@@ -66,7 +90,7 @@ export default function LinkedInAddPage() {
   const [accounts, setAccounts] = useState<LinkedInAccount[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Mode A — screenshot extraction
+  // Mode A — screenshot / XLSX import
   const [modeARow, setModeARow] = useState<PostRow>(emptyRow());
 
   // Mode B — manual bulk entry
@@ -120,17 +144,18 @@ export default function LinkedInAddPage() {
         ...r,
         extracting: false,
         extracted: true,
-        post_url:      metrics.post_url ?? r.post_url,
-        post_date:     metrics.post_date ?? r.post_date,
-        impressions:   metrics.impressions?.toString() ?? r.impressions,
-        reactions:     metrics.reactions?.toString() ?? r.reactions,
-        comments:      metrics.comments?.toString() ?? r.comments,
-        shares:        metrics.shares?.toString() ?? r.shares,
+        extraction_status: 'manual', // XLSX is not AI — it's exact data from LinkedIn
+        post_url:       metrics.post_url ?? r.post_url,
+        post_date:      metrics.post_date ?? r.post_date,
+        impressions:    metrics.impressions?.toString() ?? r.impressions,
+        reactions:      metrics.reactions?.toString() ?? r.reactions,
+        comments:       metrics.comments?.toString() ?? r.comments,
+        shares:         metrics.shares?.toString() ?? r.shares,
         profile_visits: metrics.profile_visits?.toString() ?? r.profile_visits,
         follows_gained: metrics.follows_gained?.toString() ?? r.follows_gained,
       }));
 
-      toast.success(`Metrics loaded from XLSX${extraNotes ? ' — extra data in notes' : ''}`);
+      toast.success(`Metrics loaded from XLSX${extraNotes ? ' — extra data logged to console' : ''}`);
       if (extraNotes) console.info('LinkedIn XLSX extra data:', extraNotes);
     } catch (e) {
       setModeARow(r => ({ ...r, extracting: false }));
@@ -156,14 +181,15 @@ export default function LinkedInAddPage() {
         ...r,
         extracting: false,
         extracted: true,
-        impressions: metrics.impressions?.toString() ?? '',
-        reactions: metrics.reactions?.toString() ?? '',
-        comments: metrics.comments?.toString() ?? '',
-        shares: metrics.shares?.toString() ?? '',
+        extraction_status: (extraction_status as 'ai_extracted' | 'ai_partial') ?? 'ai_extracted',
+        impressions:    metrics.impressions?.toString() ?? '',
+        reactions:      metrics.reactions?.toString() ?? '',
+        comments:       metrics.comments?.toString() ?? '',
+        shares:         metrics.shares?.toString() ?? '',
         profile_visits: metrics.profile_visits?.toString() ?? '',
         follows_gained: metrics.follows_gained?.toString() ?? '',
-        link_clicks: metrics.link_clicks?.toString() ?? '',
-        post_date: metrics.post_date ?? r.post_date,
+        link_clicks:    metrics.link_clicks?.toString() ?? '',
+        post_date:      metrics.post_date ?? r.post_date,
       }));
 
       if (extraction_status === 'ai_partial') {
@@ -183,7 +209,7 @@ export default function LinkedInAddPage() {
 
     setSubmitting(true);
     try {
-      // If there's a screenshot file, upload to R2 first
+      // Upload screenshot to R2 if present
       let screenshot_url: string | null = null;
       if (modeARow.screenshot_file) {
         const presignRes = await fetch('/api/upload/presign', {
@@ -206,25 +232,7 @@ export default function LinkedInAddPage() {
         }
       }
 
-      const body = {
-        account_id: modeARow.account_id,
-        post_url: modeARow.post_url || null,
-        post_date: modeARow.post_date,
-        post_text: modeARow.post_text || null,
-        post_format: modeARow.post_format,
-        status: 'published',
-        impressions: modeARow.impressions ? parseInt(modeARow.impressions) : null,
-        reactions: modeARow.reactions ? parseInt(modeARow.reactions) : null,
-        comments: modeARow.comments ? parseInt(modeARow.comments) : null,
-        shares: modeARow.shares ? parseInt(modeARow.shares) : null,
-        profile_visits: modeARow.profile_visits ? parseInt(modeARow.profile_visits) : null,
-        follows_gained: modeARow.follows_gained ? parseInt(modeARow.follows_gained) : null,
-        link_clicks: modeARow.link_clicks ? parseInt(modeARow.link_clicks) : null,
-        topic_tags: modeARow.topic_tags.split(',').map(t => t.trim()).filter(Boolean),
-        product_tags: modeARow.product_tags.split(',').map(t => t.trim()).filter(Boolean),
-        screenshot_url,
-        extraction_status: modeARow.extracted ? 'ai_extracted' : 'manual',
-      };
+      const body = { ...rowToPayload(modeARow), screenshot_url };
 
       const res = await fetch('/api/linkedin/posts', {
         method: 'POST',
@@ -232,11 +240,16 @@ export default function LinkedInAddPage() {
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) throw new Error('Save failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const msg = (errData as any)?.error ?? `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
       toast.success('Post saved');
       router.push('/linkedin');
-    } catch {
-      toast.error('Failed to save post');
+    } catch (e) {
+      toast.error(`Failed to save post: ${(e as Error).message}`);
     } finally {
       setSubmitting(false);
     }
@@ -262,24 +275,7 @@ export default function LinkedInAddPage() {
 
     setSubmitting(true);
     try {
-      const posts = validRows.map(r => ({
-        account_id: r.account_id,
-        post_url: r.post_url || null,
-        post_date: r.post_date,
-        post_text: r.post_text || null,
-        post_format: r.post_format,
-        status: 'published',
-        impressions: r.impressions ? parseInt(r.impressions) : null,
-        reactions: r.reactions ? parseInt(r.reactions) : null,
-        comments: r.comments ? parseInt(r.comments) : null,
-        shares: r.shares ? parseInt(r.shares) : null,
-        profile_visits: r.profile_visits ? parseInt(r.profile_visits) : null,
-        follows_gained: r.follows_gained ? parseInt(r.follows_gained) : null,
-        link_clicks: r.link_clicks ? parseInt(r.link_clicks) : null,
-        topic_tags: r.topic_tags.split(',').map(t => t.trim()).filter(Boolean),
-        product_tags: r.product_tags.split(',').map(t => t.trim()).filter(Boolean),
-        extraction_status: 'manual' as const,
-      }));
+      const posts = validRows.map(r => rowToPayload(r));
 
       const res = await fetch('/api/linkedin/posts', {
         method: 'POST',
@@ -287,12 +283,18 @@ export default function LinkedInAddPage() {
         body: JSON.stringify(posts),
       });
 
-      if (!res.ok) throw new Error('Save failed');
-      const { count } = await res.json();
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const msg = (errData as any)?.error ?? `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      const data = await res.json();
+      const count = data.posts?.length ?? validRows.length;
       toast.success(`${count} post${count !== 1 ? 's' : ''} saved`);
       router.push('/linkedin');
-    } catch {
-      toast.error('Failed to save posts');
+    } catch (e) {
+      toast.error(`Failed to save posts: ${(e as Error).message}`);
     } finally {
       setSubmitting(false);
     }
@@ -341,7 +343,9 @@ export default function LinkedInAddPage() {
                 >
                   {modeARow.extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Table2 className="h-4 w-4 text-emerald-600" />}
                   <span className="text-sm">Upload PostAnalytics XLSX</span>
-                  {modeARow.extracted && <Badge className="bg-emerald-600 text-xs ml-auto">Loaded</Badge>}
+                  {modeARow.extracted && modeARow.extraction_status === 'manual' && (
+                    <Badge className="bg-emerald-600 text-xs ml-auto">Loaded</Badge>
+                  )}
                 </Button>
                 <Button
                   type="button"
@@ -352,7 +356,12 @@ export default function LinkedInAddPage() {
                 >
                   {modeARow.extracting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4 text-blue-600" />}
                   <span className="text-sm">Upload Screenshot</span>
-                  {modeARow.screenshot_preview && !modeARow.extracted && <Badge variant="outline" className="text-xs ml-auto">Ready</Badge>}
+                  {modeARow.screenshot_preview && !modeARow.extracted && (
+                    <Badge variant="outline" className="text-xs ml-auto">Ready</Badge>
+                  )}
+                  {modeARow.extracted && modeARow.extraction_status !== 'manual' && (
+                    <Badge className="bg-blue-600 text-xs ml-auto">AI Extracted</Badge>
+                  )}
                 </Button>
                 <input ref={xlsxInputRef} type="file" accept=".xlsx,.xls" className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleXlsxUpload(f); e.target.value = ''; }} />
@@ -360,7 +369,7 @@ export default function LinkedInAddPage() {
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleScreenshotUpload(f); }} />
               </div>
 
-              {/* Screenshot preview (shown after screenshot upload) */}
+              {/* Screenshot preview */}
               {modeARow.screenshot_preview && (
                 <div className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -373,9 +382,9 @@ export default function LinkedInAddPage() {
                       </div>
                     </div>
                   )}
-                  {modeARow.extracted && <Badge className="absolute top-2 right-2 bg-emerald-600">AI Extracted</Badge>}
                 </div>
               )}
+
               {/* Account + date + format */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1">
@@ -416,8 +425,7 @@ export default function LinkedInAddPage() {
                 />
               </div>
 
-
-              {/* Extracted / manual metrics */}
+              {/* Metrics */}
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Metrics</p>
                 <div className="grid grid-cols-4 gap-2">
@@ -443,7 +451,7 @@ export default function LinkedInAddPage() {
                 </div>
               </div>
 
-              {/* Post text + tags */}
+              {/* Post text */}
               <div className="space-y-1">
                 <Label>Post Text</Label>
                 <Textarea
@@ -453,21 +461,23 @@ export default function LinkedInAddPage() {
                   placeholder="Paste the post text…"
                 />
               </div>
+
+              {/* Tags */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Topic Tags <span className="text-muted-foreground font-normal">(comma-separated)</span></Label>
-                  <Input
+                  <Label>Topic Tags</Label>
+                  <TagInput
+                    types={['topic']}
                     value={modeARow.topic_tags}
-                    onChange={e => setModeARow(r => ({ ...r, topic_tags: e.target.value }))}
-                    placeholder="e.g. safety, switchgear"
+                    onChange={tags => setModeARow(r => ({ ...r, topic_tags: tags }))}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Product Tags <span className="text-muted-foreground font-normal">(comma-separated)</span></Label>
-                  <Input
+                  <Label>Product Tags</Label>
+                  <TagInput
+                    types={['product']}
                     value={modeARow.product_tags}
-                    onChange={e => setModeARow(r => ({ ...r, product_tags: e.target.value }))}
-                    placeholder="e.g. MCB, RCD"
+                    onChange={tags => setModeARow(r => ({ ...r, product_tags: tags }))}
                   />
                 </div>
               </div>
@@ -645,20 +655,20 @@ function BulkPostRow({
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Topic Tags</Label>
-              <Input
+              <TagInput
+                types={['topic']}
                 value={row.topic_tags}
-                onChange={e => onChange({ topic_tags: e.target.value })}
-                className="h-8 text-xs"
-                placeholder="safety, switchgear"
+                onChange={tags => onChange({ topic_tags: tags })}
+                size="sm"
               />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Product Tags</Label>
-              <Input
+              <TagInput
+                types={['product']}
                 value={row.product_tags}
-                onChange={e => onChange({ product_tags: e.target.value })}
-                className="h-8 text-xs"
-                placeholder="MCB, RCD"
+                onChange={tags => onChange({ product_tags: tags })}
+                size="sm"
               />
             </div>
           </div>
