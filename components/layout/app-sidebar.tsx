@@ -20,6 +20,8 @@ import {
   PlusSquare,
   LayoutDashboard,
   Sparkles,
+  ContactRound,
+  Plug,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -97,6 +99,21 @@ const LINKEDIN_NAV_ITEMS: NavItem[] = [
   },
 ];
 
+const LEADS_NAV_ITEMS: NavItem[] = [
+  {
+    label: 'Lead Library',
+    href: '/leads',
+    icon: ContactRound,
+    roles: ['admin', 'marketing', 'sales'],
+  },
+  {
+    label: 'Zoho Setup',
+    href: '/admin/zoho',
+    icon: Plug,
+    roles: ['admin'],
+  },
+];
+
 const ADMIN_NAV_ITEMS: NavItem[] = [
   {
     label: 'Tag Management',
@@ -143,6 +160,7 @@ export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCo
   const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleAnalytics = ANALYTICS_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleLinkedIn = LINKEDIN_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
+  const visibleLeads = LEADS_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleAdmin = ADMIN_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
 
   function NavLink({ item }: { item: NavItem }) {
@@ -239,6 +257,25 @@ export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCo
               )}
               <nav className="space-y-1">
                 {visibleLinkedIn.map((item) => (
+                  <NavLink key={item.href} item={item} />
+                ))}
+              </nav>
+            </>
+          )}
+
+          {/* Leads / CRM section */}
+          {visibleLeads.length > 0 && (
+            <>
+              <Separator className="my-4 bg-white/10" />
+              {!collapsed && (
+                <div className="px-3 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-white/30">
+                    CRM Leads
+                  </span>
+                </div>
+              )}
+              <nav className="space-y-1">
+                {visibleLeads.map((item) => (
                   <NavLink key={item.href} item={item} />
                 ))}
               </nav>
