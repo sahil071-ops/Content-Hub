@@ -14,14 +14,14 @@ import { cn } from '@/lib/utils';
 import type { LinkedInPost, LinkedInAccount, LinkedInPostFormat } from '@/types/database';
 
 const FORMAT_OPTIONS: { value: string; label: string }[] = [
-  { value: 'all', label: 'All formats' },
-  { value: 'text', label: 'Text' },
-  { value: 'image', label: 'Image' },
-  { value: 'video', label: 'Video' },
-  { value: 'carousel', label: 'Carousel' },
-  { value: 'document', label: 'Document' },
-  { value: 'poll', label: 'Poll' },
-  { value: 'other', label: 'Other' },
+  { value: 'all',       label: 'All types' },
+  { value: 'text',      label: 'Text' },
+  { value: 'image',     label: 'Photo / Image' },
+  { value: 'video',     label: 'Video' },
+  { value: 'carousel',  label: 'Carousel' },
+  { value: 'document',  label: 'Document' },
+  { value: 'poll',      label: 'Poll' },
+  { value: 'other',     label: 'Other' },
 ];
 
 export default function LinkedInLibraryPage() {
@@ -103,7 +103,7 @@ export default function LinkedInLibraryPage() {
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -132,51 +132,53 @@ export default function LinkedInLibraryPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <div className="relative flex-1 min-w-48">
+      <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:items-center">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search posts, accounts, tags…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8"
+            className="pl-8 w-full"
           />
         </div>
 
-        <Select value={accountFilter} onValueChange={setAccountFilter}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Account" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All accounts</SelectItem>
-            {accounts.map((a) => (
-              <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2 flex-wrap">
+          <Select value={accountFilter} onValueChange={setAccountFilter}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Account" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All accounts</SelectItem>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select value={formatFilter} onValueChange={setFormatFilter}>
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="Format" />
-          </SelectTrigger>
-          <SelectContent>
-            {FORMAT_OPTIONS.map((f) => (
-              <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select value={formatFilter} onValueChange={setFormatFilter}>
+            <SelectTrigger className="w-full sm:w-36">
+              <SelectValue placeholder="Content Type" />
+            </SelectTrigger>
+            <SelectContent>
+              {FORMAT_OPTIONS.map((f) => (
+                <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <div className="flex items-center gap-1">
-          <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder="Min eng %"
-            value={minEngagement}
-            onChange={(e) => setMinEngagement(e.target.value)}
-            className="w-24"
-            type="number"
-            min="0"
-            step="0.1"
-          />
+          <div className="flex items-center gap-1">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <Input
+              placeholder="Min eng %"
+              value={minEngagement}
+              onChange={(e) => setMinEngagement(e.target.value)}
+              className="w-24"
+              type="number"
+              min="0"
+              step="0.1"
+            />
+          </div>
         </div>
       </div>
 
@@ -237,11 +239,11 @@ function TableView({
             <th className="text-left px-3 py-2 font-medium text-muted-foreground">Account</th>
             <th className="text-left px-3 py-2 font-medium text-muted-foreground">Date</th>
             <th className="text-left px-3 py-2 font-medium text-muted-foreground">Post</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground">Format</th>
-            <th className="text-right px-3 py-2 font-medium text-muted-foreground">Impressions</th>
-            <th className="text-right px-3 py-2 font-medium text-muted-foreground">Reactions</th>
-            <th className="text-right px-3 py-2 font-medium text-muted-foreground">Comments</th>
-            <th className="text-right px-3 py-2 font-medium text-muted-foreground">Shares</th>
+            <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden sm:table-cell">Type</th>
+            <th className="text-right px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Impressions</th>
+            <th className="text-right px-3 py-2 font-medium text-muted-foreground hidden sm:table-cell">Reactions</th>
+            <th className="text-right px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Comments</th>
+            <th className="text-right px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Shares</th>
             <th className="text-right px-3 py-2 font-medium text-muted-foreground">Eng. Rate</th>
           </tr>
         </thead>
@@ -270,15 +272,15 @@ function TableView({
                   </div>
                 )}
               </td>
-              <td className="px-3 py-2">
+              <td className="px-3 py-2 hidden sm:table-cell">
                 <FormatBadge format={post.post_format} />
               </td>
-              <td className="px-3 py-2 text-right tabular-nums">
+              <td className="px-3 py-2 text-right tabular-nums hidden md:table-cell">
                 {post.impressions?.toLocaleString() ?? '—'}
               </td>
-              <td className="px-3 py-2 text-right tabular-nums">{post.reactions ?? '—'}</td>
-              <td className="px-3 py-2 text-right tabular-nums">{post.comments ?? '—'}</td>
-              <td className="px-3 py-2 text-right tabular-nums">{post.shares ?? '—'}</td>
+              <td className="px-3 py-2 text-right tabular-nums hidden sm:table-cell">{post.reactions ?? '—'}</td>
+              <td className="px-3 py-2 text-right tabular-nums hidden md:table-cell">{post.comments ?? '—'}</td>
+              <td className="px-3 py-2 text-right tabular-nums hidden lg:table-cell">{post.shares ?? '—'}</td>
               <td className="px-3 py-2 text-right">
                 <EngagementBadge
                   rate={post.engagement_rate}

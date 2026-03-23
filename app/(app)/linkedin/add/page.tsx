@@ -15,7 +15,15 @@ import { TagInput } from '@/components/ui/tag-input';
 import { toast } from 'sonner';
 import type { LinkedInAccount, LinkedInPostFormat, LinkedInExtractedMetrics } from '@/types/database';
 
-const FORMAT_OPTIONS: LinkedInPostFormat[] = ['text', 'image', 'video', 'carousel', 'document', 'poll', 'other'];
+const FORMAT_OPTIONS: { value: LinkedInPostFormat; label: string }[] = [
+  { value: 'text',      label: 'Text' },
+  { value: 'image',     label: 'Photo / Image' },
+  { value: 'video',     label: 'Video' },
+  { value: 'carousel',  label: 'Carousel' },
+  { value: 'document',  label: 'Document' },
+  { value: 'poll',      label: 'Poll' },
+  { value: 'other',     label: 'Other' },
+];
 
 interface PostRow {
   id: string;
@@ -301,7 +309,7 @@ export default function LinkedInAddPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Add LinkedIn Post</h1>
         <p className="text-sm text-muted-foreground">
@@ -385,8 +393,8 @@ export default function LinkedInAddPage() {
                 </div>
               )}
 
-              {/* Account + date + format */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* Account + date + content type */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label>Account *</Label>
                   <Select value={modeARow.account_id} onValueChange={v => setModeARow(r => ({ ...r, account_id: v }))}>
@@ -405,11 +413,11 @@ export default function LinkedInAddPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Format</Label>
+                  <Label>Content Type</Label>
                   <Select value={modeARow.post_format} onValueChange={v => setModeARow(r => ({ ...r, post_format: v as LinkedInPostFormat }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {FORMAT_OPTIONS.map(f => <SelectItem key={f} value={f} className="capitalize">{f}</SelectItem>)}
+                      {FORMAT_OPTIONS.map(f => <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -428,7 +436,7 @@ export default function LinkedInAddPage() {
               {/* Metrics */}
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Metrics</p>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { key: 'impressions', label: 'Impressions' },
                     { key: 'reactions', label: 'Reactions' },
@@ -463,7 +471,7 @@ export default function LinkedInAddPage() {
               </div>
 
               {/* Tags */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Topic Tags</Label>
                   <TagInput
@@ -580,7 +588,7 @@ function BulkPostRow({
       {/* Expanded form */}
       {row.expanded && (
         <div className="border-t p-3 space-y-3">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Account *</Label>
               <Select value={row.account_id} onValueChange={v => onChange({ account_id: v })}>
@@ -600,11 +608,11 @@ function BulkPostRow({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Format</Label>
+              <Label className="text-xs">Content Type</Label>
               <Select value={row.post_format} onValueChange={v => onChange({ post_format: v as LinkedInPostFormat })}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {FORMAT_OPTIONS.map(f => <SelectItem key={f} value={f} className="capitalize text-xs">{f}</SelectItem>)}
+                  {FORMAT_OPTIONS.map(f => <SelectItem key={f.value} value={f.value} className="text-xs">{f.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -620,7 +628,7 @@ function BulkPostRow({
             />
           </div>
 
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
               { key: 'impressions', label: 'Impressions' },
               { key: 'reactions', label: 'Reactions' },
@@ -652,7 +660,7 @@ function BulkPostRow({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Topic Tags</Label>
               <TagInput
