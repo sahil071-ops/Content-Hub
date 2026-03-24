@@ -406,6 +406,73 @@ export interface BrevoSnapshotData {
   avg_ctor: number;
 }
 
+// ── CRM / Leads (Phase 4) ───────────────────────────────────────
+
+export type LeadEnrichmentStatus = 'none' | 'pending' | 'done' | 'failed';
+
+export interface ZohoConnection {
+  id: string;
+  data_center: string;
+  access_token: string | null;
+  refresh_token: string;
+  token_expires_at: string | null;
+  zoho_org_id: string | null;
+  zoho_user_email: string | null;
+  connected_by: string | null;
+  connected_at: string;
+  last_pull_at: string | null;
+  is_active: boolean;
+}
+
+export interface Lead {
+  id: string;
+  zoho_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  company: string | null;
+  title: string | null;
+  website: string | null;
+  lead_source: string | null;
+  industry: string | null;
+  lead_status: string | null;
+  rating: string | null;
+  description: string | null;
+  country: string | null;
+  is_spam: boolean;
+  spam_score: number | null;
+  spam_reasons: string[];
+  spam_reviewed: boolean;
+  quality_score: number | null;
+  is_high_value: boolean;
+  enrichment_status: LeadEnrichmentStatus;
+  enrichment_done_at: string | null;
+  raw_data: Record<string, unknown> | null;
+  zoho_created_at: string | null;
+  zoho_modified_at: string | null;
+  pulled_at: string;
+  created_at: string;
+  updated_at: string;
+  // Joined
+  enrichment?: LeadEnrichment | null;
+}
+
+export interface LeadEnrichment {
+  id: string;
+  lead_id: string;
+  company_summary: string | null;
+  likely_use_case: string | null;
+  recommended_products: string[];
+  talking_points: string[];
+  follow_up_suggestion: string | null;
+  deal_potential: 'low' | 'medium' | 'high' | null;
+  notes: string | null;
+  raw_response: Record<string, unknown> | null;
+  generated_at: string;
+}
+
 // ── Supabase Database generic type ─────────────────────────────
 
 export interface Database {
