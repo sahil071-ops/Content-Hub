@@ -22,12 +22,12 @@ import {
   Sparkles,
   ContactRound,
   Plug,
+  Brain,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { AiLearningsWidget } from '@/components/crm/ai-learnings-widget';
 import type { UserRoleEnum } from '@/types/database';
 
 interface NavItem {
@@ -105,6 +105,12 @@ const LEADS_NAV_ITEMS: NavItem[] = [
     label: 'Lead Library',
     href: '/leads',
     icon: ContactRound,
+    roles: ['admin', 'marketing', 'sales'],
+  },
+  {
+    label: 'AI Learnings',
+    href: '/leads/learnings',
+    icon: Brain,
     roles: ['admin', 'marketing', 'sales'],
   },
   {
@@ -280,9 +286,6 @@ export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCo
                   <NavLink key={item.href} item={item} />
                 ))}
               </nav>
-              {!collapsed && (
-                <AiLearningsWidget userRole={userRole} />
-              )}
             </>
           )}
 
