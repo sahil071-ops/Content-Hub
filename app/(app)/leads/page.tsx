@@ -5,7 +5,7 @@ import {
   Search, RefreshCw, Loader2, ShieldAlert, Star, Users,
   ChevronDown, ChevronUp, Sparkles, ThumbsUp, ThumbsDown,
   Phone, Mail, Globe, Building2, Briefcase, MapPin,
-  CheckCircle2, XCircle, TrendingUp, AlertTriangle,
+  CheckCircle2, XCircle, TrendingUp, AlertTriangle, Linkedin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -228,6 +228,38 @@ export default function LeadsPage() {
   );
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const FREE_DOMAINS = new Set([
+  'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.in', 'yahoo.co.uk',
+  'hotmail.com', 'hotmail.co.uk', 'outlook.com', 'live.com', 'msn.com',
+  'icloud.com', 'me.com', 'mac.com', 'aol.com', 'protonmail.com',
+  'proton.me', 'zohomail.com', 'rediffmail.com', 'ymail.com', 'inbox.com',
+  'mail.com', 'gmx.com', 'gmx.net',
+]);
+
+/** Returns the domain from an email only if it looks like a real company domain. */
+function getCompanyDomain(email: string | null): string | null {
+  if (!email) return null;
+  const domain = email.split('@')[1]?.toLowerCase().trim();
+  if (!domain || FREE_DOMAINS.has(domain)) return null;
+  return domain;
+}
+
+/**
+ * Returns a LinkedIn people-search URL when the lead has enough identity signals
+ * to make the search meaningful (real name + company/domain, not spam).
+ */
+function getLinkedInSearchUrl(lead: Lead): string | null {
+  if (lead.is_spam) return null;
+  const name = [lead.first_name, lead.last_name].filter(Boolean).join(' ').trim();
+  if (name.length < 3) return null;                       // no real name
+  const company = lead.company?.trim() || getCompanyDomain(lead.email)?.split('.')[0] || '';
+  if (!company) return null;                              // need company context
+  const q = [name, company].filter(Boolean).join(' ');
+  return `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(q)}`;
+}
+
 // ── LeadCard ────────────────────────────────────────────────────────────────
 
 function LeadCard({
@@ -241,9 +273,11 @@ function LeadCard({
   isEnriching: boolean;
   isEditor: boolean;
 }) {
-  const fullName = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '—';
-  const quality  = computeQualityBreakdown(lead);
-  const enrichment = lead.enrichment as (LeadEnrichment & Record<string, unknown>) | null | undefined;
+  const fullName      = [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '—';
+  const quality       = computeQualityBreakdown(lead);
+  const enrichment    = lead.enrichment as (LeadEnrichment & Record<string, unknown>) | null | undefined;
+  const companyDomain = getCompanyDomain(lead.email);
+  const linkedInUrl   = getLinkedInSearchUrl(lead);
 
   return (
     <div className={cn(
@@ -319,6 +353,13 @@ function LeadCard({
                 <Mail className="h-4 w-4 shrink-0" />{lead.email}
               </a>
             )}
+            {/* Company domain derived from email — opens company website */}
+            {companyDomain && (
+              <a href={`https://${companyDomain}`} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 text-primary hover:underline">
+                <Globe className="h-4 w-4 shrink-0" />{companyDomain}
+              </a>
+            )}
             {(lead.phone || lead.mobile) && (
               <span className="flex items-center gap-2 text-muted-foreground">
                 <Phone className="h-4 w-4 shrink-0" />{lead.phone || lead.mobile}
@@ -335,7 +376,8 @@ function LeadCard({
               </span>
             )}
             {lead.website && (
-              <a href={lead.website} target="_blank" rel="noopener noreferrer"
+              <a href={lead.website.startsWith('http') ? lead.website : `https://${lead.website}`}
+                target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
                 <Globe className="h-4 w-4 shrink-0" />{lead.website}
               </a>
@@ -344,6 +386,13 @@ function LeadCard({
               <span className="flex items-center gap-2 text-muted-foreground">
                 <MapPin className="h-4 w-4 shrink-0" />{lead.country}
               </span>
+            )}
+            {/* LinkedIn people search — only for non-spam leads with name + company */}
+            {linkedInUrl && (
+              <a href={linkedInUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 text-[#0077b5] hover:underline">
+                <Linkedin className="h-4 w-4 shrink-0" />Find on LinkedIn
+              </a>
             )}
           </div>
 

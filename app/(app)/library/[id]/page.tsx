@@ -76,9 +76,22 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
     related = relatedData || [];
   }
 
-  const isVideo = item.content_type === 'video';
-  const isPdf = item.content_type === 'pdf';
-  const isImage = item.content_type === 'image';
+  // Content types that are always PDF documents
+  const PDF_TYPES = new Set(['pdf', 'ebook', 'whitepaper', 'catalogue', 'flier', 'presentation', 'emailer']);
+  // Content types that are always image files
+  const IMAGE_TYPES = new Set(['image', 'graphic', 'poster']);
+
+  // Also detect from the actual file URL extension (most reliable for mixed types like 'other')
+  const fileExt = item.file_url
+    ? item.file_url.toLowerCase().split('?')[0].split('.').pop() ?? ''
+    : '';
+  const urlIsPdf   = fileExt === 'pdf';
+  const urlIsImage = /^(jpg|jpeg|png|gif|webp|svg|avif)$/.test(fileExt);
+  const urlIsVideo = /^(mp4|webm|mov|avi|mkv)$/.test(fileExt);
+
+  const isVideo     = item.content_type === 'video' || item.content_type === 'video_file' || urlIsVideo;
+  const isPdf       = !!item.file_url && (urlIsPdf   || PDF_TYPES.has(item.content_type));
+  const isImage     = !!item.file_url && (urlIsImage || IMAGE_TYPES.has(item.content_type));
   const youtubeData = item.meta?.youtube as any;
   const archivedBlog = item.meta?.archived_blog as any;
 
@@ -105,6 +118,15 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                   className="w-full h-full"
+                />
+              </div>
+            ) : isVideo && item.file_url ? (
+              <div className="aspect-video bg-black flex items-center justify-center">
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <video
+                  src={item.file_url}
+                  controls
+                  className="w-full h-full max-h-[600px]"
                 />
               </div>
             ) : isPdf && item.file_url ? (
