@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AiLearningsWidget } from '@/components/crm/ai-learnings-widget';
 import type { UserRoleEnum } from '@/types/database';
 
 interface NavItem {
@@ -279,6 +280,9 @@ export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCo
                   <NavLink key={item.href} item={item} />
                 ))}
               </nav>
+              {!collapsed && (
+                <AiLearningsWidget userRole={userRole} />
+              )}
             </>
           )}
 
