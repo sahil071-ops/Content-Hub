@@ -6,6 +6,77 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [v0.3.0] — 2026-03-25
+
+### Added — Favicon
+- App favicon (`app/icon.svg`) — blue "A" on brand-colour background, auto-picked up by Next.js
+
+### Added — CRM Leads improvements
+- Company domain extracted from non-free email addresses shown as clickable link in lead detail
+- "Find on LinkedIn" search link generated for non-spam leads with name + company context
+- All external links (domain, LinkedIn, website) open in new tab
+
+### Added — Content previews for all types
+- PDFs: ebook, whitepaper, catalogue, flier, presentation, emailer now all render with the PDF iframe viewer
+- Images: graphic, poster now render inline
+- Video files: video_file type with a file URL now shows an HTML5 video player
+- Extension-based fallback: any content type with a `.pdf`, `.jpg`, `.png` etc URL shows a preview automatically
+
+### Changed — MIS Dashboard Redesign (v0.3.0)
+
+**General**
+- Every section now answers one clear question in the header (e.g. "Is our channel growing?")
+- Each section has a coloured left border matching its source: YouTube = red, GA4 = blue, Search Console = green, Brevo = teal
+- Auto-generated one-line plain English summary beneath the headline numbers in every section
+- AI Highlights moved to full-width section at the very top (most valuable content first)
+- Dashboard controls (period selector, India toggle, Pull button) are now sticky as user scrolls
+- Mini navigation bar below sticky controls lets you jump to any section
+- "Last updated" timestamp shown prominently in sticky bar
+
+**AI Highlights**
+- New system prompt with full company context (Axis India, B2B industrial tech, India focus)
+- Each highlight now tagged as WIN / PROBLEM / OPPORTUNITY / WATCH with colour coding
+- WIN = green, PROBLEM = red, OPPORTUNITY = amber, WATCH = blue
+- Highlights shown in a 2-column grid with larger, more readable cards
+- Supporting data points collapsible below each card
+- Feedback buttons redesigned to be more prominent
+- `HighlightItem` type extended with `tag` and `data_points` fields (backward compatible)
+
+**YouTube Section**
+- Hero number: total channel subscribers (most stable growth signal available via API key)
+- Secondary: period views, avg views/video, watch time (with clear note when unavailable)
+- Top 5 videos shown as visual bar-list with thumbnail + proportional view bar + YouTube link on hover
+- Removed "Channel Total Views" scorecard (vanity metric)
+- Clear note explaining watch time/timeline limitations of YouTube Data API v3 (no OAuth)
+
+**GA4 Section**
+- Hero: Organic sessions with delta vs previous period (colour coded green/red)
+- Prominent India callout: "🇮🇳 68% of traffic is from India" with session count
+- New/returning shown as two numbers side by side (percentage each) instead of bar
+- Country chart uses top 8 countries, taller height
+- Sessions timeline chart increased to 260px height for better trend visibility
+
+**Search Console Section**
+- 4-across hero row: Clicks, Impressions, Avg CTR, Avg Position — all with deltas
+- CTR Opportunity box (amber): automatically surfaces queries with >500 impressions but <1% CTR
+- Top Queries table: colour-coded CTR badges (green ≥5%, amber 1-5%, red <1%), alternating rows
+- Top Pages table: Opportunity Score column (impressions ÷ clicks), top 3 opportunities highlighted
+- Links in pages table open in new tab
+- Clicks over time line chart (when timeline data available)
+
+**Brevo Section**
+- Hero: Avg open rate with B2B industry benchmark comparison (22%)
+- Open Rate column colour-coded: green ≥25%, amber 15-25%, red <15%
+- High unsubscribe campaigns now flagged in red (was amber)
+- Open rate + click rate trend line chart across campaigns
+- Send dates shown in campaign table
+
+### Fixed
+- `GscSnapshotData` usage: added `impressions_prev` fallback for delta display
+- MIS page passes `lastPullTime` (most recent snapshot `created_at`) to client for display
+
+---
+
 ## [v0.2.0] — 2026-03-20
 
 ### Added — Phase 2a: Content Analytics Hub
