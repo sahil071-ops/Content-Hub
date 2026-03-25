@@ -308,6 +308,10 @@ export interface HighlightItem {
   source: MisSourceEnum;
   text: string;
   sentiment: 'positive' | 'warning' | 'anomaly';
+  /** Actionability tag — WIN | PROBLEM | OPPORTUNITY | WATCH */
+  tag?: 'WIN' | 'PROBLEM' | 'OPPORTUNITY' | 'WATCH';
+  /** Supporting data points that triggered this insight (optional) */
+  data_points?: string[];
 }
 
 export interface ContentTarget {

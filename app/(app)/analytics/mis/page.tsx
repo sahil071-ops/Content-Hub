@@ -81,15 +81,16 @@ export default async function MisDashboardPage() {
   const hasYoutube = Boolean(process.env.YOUTUBE_CHANNEL_ID);
   const hasBrevo = Boolean(process.env.BREVO_API_KEY);
 
+  // Most recent pull timestamp across all snapshots
+  const lastPullTime = snapshotRows?.[0]?.created_at ?? null;
+
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Marketing MIS Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Unified performance view across GA4, Search Console, YouTube, and Brevo
-          </p>
-        </div>
+    <div className="p-6 space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold">Marketing MIS Dashboard</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Unified performance view across GA4, Search Console, YouTube, and Brevo
+        </p>
       </div>
 
       <MisDashboardClient
@@ -110,6 +111,7 @@ export default async function MisDashboardPage() {
         hasGscEs={hasGscEs}
         hasYoutube={hasYoutube}
         hasBrevo={hasBrevo}
+        lastPullTime={lastPullTime}
       />
     </div>
   );

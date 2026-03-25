@@ -8,6 +8,7 @@ import { YouTubeSection } from './youtube-section';
 import { SearchConsoleSection } from './search-console-section';
 import { GA4Section } from './ga4-section';
 import { BrevoSection } from './brevo-section';
+import { cn } from '@/lib/utils';
 import type {
   MisHighlight,
   MisPeriodTypeEnum,
@@ -38,6 +39,48 @@ interface MisDashboardClientProps {
   hasGscEs: boolean;
   hasYoutube: boolean;
   hasBrevo: boolean;
+  lastPullTime?: string | null;
+}
+
+// Source accent colours for section borders and nav pills
+const SOURCE_COLORS = {
+  youtube:        { border: 'border-l-red-500',     pill: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',     dot: 'bg-red-500' },
+  gsc:            { border: 'border-l-emerald-500',  pill: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', dot: 'bg-emerald-500' },
+  ga4:            { border: 'border-l-blue-500',     pill: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', dot: 'bg-blue-500' },
+  brevo:          { border: 'border-l-teal-500',     pill: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300', dot: 'bg-teal-500' },
+};
+
+const EMPTY_PLACEHOLDER = (
+  <div className="py-8 text-center text-sm text-muted-foreground">
+    No data yet. Trigger a pull to load data for this source.
+  </div>
+);
+
+function SectionCard({
+  id,
+  title,
+  question,
+  colorKey,
+  children,
+}: {
+  id: string;
+  title: string;
+  question: string;
+  colorKey: keyof typeof SOURCE_COLORS;
+  children: React.ReactNode;
+}) {
+  const color = SOURCE_COLORS[colorKey];
+  return (
+    <div id={id} className={cn('rounded-lg border border-l-4 bg-card', color.border)}>
+      <div className="px-5 pt-4 pb-1">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h2 className="font-bold text-base">{title}</h2>
+          <p className="text-sm text-muted-foreground">{question}</p>
+        </div>
+      </div>
+      <div className="px-5 pb-5">{children}</div>
+    </div>
+  );
 }
 
 export function MisDashboardClient({
@@ -51,64 +94,89 @@ export function MisDashboardClient({
   hasGscEs,
   hasYoutube,
   hasBrevo,
+  lastPullTime,
 }: MisDashboardClientProps) {
   const [periodType, setPeriodType] = useState<MisPeriodTypeEnum>('monthly');
   const [countryFilter, setCountryFilter] = useState<'all' | 'india'>('all');
 
-  const EMPTY_PLACEHOLDER = (
-    <div className="py-8 text-center text-sm text-muted-foreground">
-      No data yet. Trigger a pull to load data for this source.
-    </div>
-  );
+  // Build the list of active sections for the mini nav
+  const navSections: { id: string; label: string; colorKey: keyof typeof SOURCE_COLORS }[] = [
+    ...(hasYoutube || snapshots.youtube ? [{ id: 'section-youtube', label: 'YouTube', colorKey: 'youtube' as const }] : []),
+    ...(hasGscMain || snapshots.gsc_main ? [{ id: 'section-gsc-main', label: 'Search Console', colorKey: 'gsc' as const }] : []),
+    ...(hasGscEs || snapshots.gsc_es ? [{ id: 'section-gsc-es', label: 'GSC — ES', colorKey: 'gsc' as const }] : []),
+    ...(hasGA4Main || snapshots.ga4_main ? [{ id: 'section-ga4-main', label: 'GA4', colorKey: 'ga4' as const }] : []),
+    ...(hasGA4Es || snapshots.ga4_es ? [{ id: 'section-ga4-es', label: 'GA4 — ES', colorKey: 'ga4' as const }] : []),
+    ...(hasBrevo || snapshots.brevo ? [{ id: 'section-brevo', label: 'Brevo', colorKey: 'brevo' as const }] : []),
+  ];
 
   const widgets = [
     ...(hasYoutube || snapshots.youtube ? [{
       id: 'youtube',
       label: 'YouTube Analytics',
       badge: 'YouTube',
-      component: snapshots.youtube
-        ? <YouTubeSection data={snapshots.youtube} />
-        : EMPTY_PLACEHOLDER,
+      component: (
+        <SectionCard id="section-youtube" title="YouTube Analytics" question="Is our channel growing?" colorKey="youtube">
+          {snapshots.youtube ? <YouTubeSection data={snapshots.youtube} /> : EMPTY_PLACEHOLDER}
+        </SectionCard>
+      ),
     }] : []),
     ...(hasGscMain || snapshots.gsc_main ? [{
       id: 'gsc_main',
       label: 'Search Console — Main Site',
       badge: 'GSC',
-      component: snapshots.gsc_main
-        ? <SearchConsoleSection data={snapshots.gsc_main} countryFilter={countryFilter} />
-        : EMPTY_PLACEHOLDER,
+      component: (
+        <SectionCard id="section-gsc-main" title="Search Console — Main Site" question="Are we ranking and are people clicking?" colorKey="gsc">
+          {snapshots.gsc_main
+            ? <SearchConsoleSection data={snapshots.gsc_main} countryFilter={countryFilter} />
+            : EMPTY_PLACEHOLDER}
+        </SectionCard>
+      ),
     }] : []),
     ...(hasGscEs || snapshots.gsc_es ? [{
       id: 'gsc_es',
       label: 'Search Console — ES Site',
       badge: 'GSC',
-      component: snapshots.gsc_es
-        ? <SearchConsoleSection data={snapshots.gsc_es} countryFilter={countryFilter} />
-        : EMPTY_PLACEHOLDER,
+      component: (
+        <SectionCard id="section-gsc-es" title="Search Console — ES Site" question="Are we ranking and are people clicking?" colorKey="gsc">
+          {snapshots.gsc_es
+            ? <SearchConsoleSection data={snapshots.gsc_es} countryFilter={countryFilter} />
+            : EMPTY_PLACEHOLDER}
+        </SectionCard>
+      ),
     }] : []),
     ...(hasGA4Main || snapshots.ga4_main ? [{
       id: 'ga4_main',
       label: 'GA4 — Main Site',
       badge: 'GA4',
-      component: snapshots.ga4_main
-        ? <GA4Section data={snapshots.ga4_main} countryFilter={countryFilter} />
-        : EMPTY_PLACEHOLDER,
+      component: (
+        <SectionCard id="section-ga4-main" title="GA4 — Main Site" question="Where is our website traffic coming from?" colorKey="ga4">
+          {snapshots.ga4_main
+            ? <GA4Section data={snapshots.ga4_main} countryFilter={countryFilter} />
+            : EMPTY_PLACEHOLDER}
+        </SectionCard>
+      ),
     }] : []),
     ...(hasGA4Es || snapshots.ga4_es ? [{
       id: 'ga4_es',
       label: 'GA4 — ES Site',
       badge: 'GA4',
-      component: snapshots.ga4_es
-        ? <GA4Section data={snapshots.ga4_es} countryFilter={countryFilter} />
-        : EMPTY_PLACEHOLDER,
+      component: (
+        <SectionCard id="section-ga4-es" title="GA4 — ES Site" question="Where is our Spanish site traffic coming from?" colorKey="ga4">
+          {snapshots.ga4_es
+            ? <GA4Section data={snapshots.ga4_es} countryFilter={countryFilter} />
+            : EMPTY_PLACEHOLDER}
+        </SectionCard>
+      ),
     }] : []),
     ...(hasBrevo || snapshots.brevo ? [{
       id: 'brevo',
       label: 'Brevo Email Marketing',
       badge: 'Brevo',
-      component: snapshots.brevo
-        ? <BrevoSection data={snapshots.brevo} />
-        : EMPTY_PLACEHOLDER,
+      component: (
+        <SectionCard id="section-brevo" title="Brevo Email Marketing" question="How are our email campaigns performing?" colorKey="brevo">
+          {snapshots.brevo ? <BrevoSection data={snapshots.brevo} /> : EMPTY_PLACEHOLDER}
+        </SectionCard>
+      ),
     }] : []),
   ];
 
@@ -124,26 +192,63 @@ export function MisDashboardClient({
   }
 
   return (
-    <div className="space-y-6">
-      {/* Controls */}
-      <DashboardControls
-        isAdmin={isAdmin}
-        periodType={periodType}
-        onPeriodChange={setPeriodType}
-        countryFilter={countryFilter}
-        onCountryFilterChange={setCountryFilter}
-      />
+    <div className="space-y-0">
+      {/* ── Sticky controls bar ── */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b pb-3 pt-2 mb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <DashboardControls
+            isAdmin={isAdmin}
+            periodType={periodType}
+            onPeriodChange={setPeriodType}
+            countryFilter={countryFilter}
+            onCountryFilterChange={setCountryFilter}
+          />
+          {/* Last updated timestamp */}
+          {lastPullTime && (
+            <p className="text-xs text-muted-foreground shrink-0">
+              Last updated: {new Date(lastPullTime).toLocaleString('en-GB', {
+                day: 'numeric', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+              })}
+            </p>
+          )}
+        </div>
 
-      {/* AI Highlights — always at top */}
+        {/* Mini section nav */}
+        {navSections.length > 1 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {navSections.map(s => {
+              const color = SOURCE_COLORS[s.colorKey];
+              return (
+                <a
+                  key={s.id}
+                  href={`#${s.id}`}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                    color.pill,
+                  )}
+                >
+                  <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', color.dot)} />
+                  {s.label}
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── AI Highlights — full width, always first ── */}
       <AiHighlightsPanel highlight={latestHighlight} />
 
-      {/* Configurable widget layout */}
-      <DashboardLayout
-        widgets={widgets}
-        initialConfig={initialConfig}
-        dashboardName="mis"
-        isAdmin={isAdmin}
-      />
+      {/* ── Configurable widget layout (sections wrapped in SectionCard above) ── */}
+      <div className="mt-6">
+        <DashboardLayout
+          widgets={widgets}
+          initialConfig={initialConfig}
+          dashboardName="mis"
+          isAdmin={isAdmin}
+        />
+      </div>
     </div>
   );
 }
