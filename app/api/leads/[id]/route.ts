@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-/** GET /api/leads/[id] */
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -27,11 +26,13 @@ export async function GET(
 
 /**
  * PUT /api/leads/[id]
- * Allows overriding spam/high_value flags and marking spam_reviewed.
+ * Enforces mutual exclusivity: a lead cannot be both spam AND high-value.
+ * - Setting is_spam=true always clears is_high_value
+ * - Setting is_high_value=true always clears is_spam
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -43,12 +44,15 @@ export async function PUT(
   }
 
   const body = await request.json();
-  // Only allow safe fields to be updated manually
   const allowed: Record<string, unknown> = {};
   const safeFields = ['is_spam', 'spam_reviewed', 'is_high_value', 'lead_status', 'rating'];
   for (const f of safeFields) {
     if (f in body) allowed[f] = body[f];
   }
+
+  // Enforce mutual exclusivity
+  if (allowed.is_spam === true)       allowed.is_high_value = false;
+  if (allowed.is_high_value === true) allowed.is_spam = false;
 
   const { data, error } = await supabase
     .from('leads')
