@@ -30,9 +30,11 @@ const PDF_CONTENT_TYPES = new Set([
  */
 async function generateThumbnailFromUrl(url: string): Promise<string> {
   const pdfjs = await import('pdfjs-dist');
-  // Use a CDN worker — avoids bundling the worker
-  pdfjs.GlobalWorkerOptions.workerSrc =
-    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+  // Use the locally bundled worker — CDN is unreliable and may have version mismatches
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+  ).toString();
 
   const res = await fetch(url, { mode: 'cors' });
   if (!res.ok) throw new Error(`Failed to fetch PDF: ${res.status}`);
