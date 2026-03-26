@@ -43,10 +43,12 @@ export function PostDetailPanel({ post, accounts, accountAvg, onClose, onUpdated
   async function handleSave() {
     setSaving(true);
     try {
+      // Strip joined/computed fields — only send actual DB columns
+      const { account, linked_content, engagement_rate, ...payload } = draft as any;
       const res = await fetch('/api/linkedin/posts', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draft),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Save failed');
