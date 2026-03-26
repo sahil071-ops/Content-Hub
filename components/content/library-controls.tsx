@@ -33,15 +33,19 @@ export function ViewToggle({ current, searchParamsStr }: ViewToggleProps) {
     const params = new URLSearchParams(searchParamsStr);
     if (view === 'grid') params.delete('view');
     else params.set('view', 'list');
-    try { sessionStorage.setItem('library-view', view); } catch { /* ok */ }
     const qs = params.toString();
     return `/library${qs ? `?${qs}` : ''}`;
+  }
+
+  function saveView(view: 'grid' | 'list') {
+    try { sessionStorage.setItem('library-view', view); } catch { /* ok */ }
   }
 
   return (
     <div className="flex rounded-md border overflow-hidden">
       <Link
         href={buildUrl('grid')}
+        onClick={() => saveView('grid')}
         className={`flex items-center px-3 py-2 transition-colors ${
           current === 'grid' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
         }`}
@@ -51,6 +55,7 @@ export function ViewToggle({ current, searchParamsStr }: ViewToggleProps) {
       </Link>
       <Link
         href={buildUrl('list')}
+        onClick={() => saveView('list')}
         className={`flex items-center px-3 py-2 transition-colors ${
           current === 'list' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
         }`}
