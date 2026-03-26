@@ -32,6 +32,7 @@ export default function LinkedInLibraryPage() {
   const [view, setView] = useState<'table' | 'card'>('table');
   const [selectedPost, setSelectedPost] = useState<LinkedInPost | null>(null);
   const [isEditor, setIsEditor] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -41,6 +42,7 @@ export default function LinkedInLibraryPage() {
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const params = new URLSearchParams({ status: 'published' });
       if (accountFilter !== 'all') params.set('account_id', accountFilter);
@@ -79,6 +81,9 @@ export default function LinkedInLibraryPage() {
         const me = await meRes.json();
         setIsEditor(['admin', 'marketing'].includes(me?.role));
       }
+    } catch (err) {
+      console.error('Failed to load LinkedIn posts:', err);
+      setFetchError(err instanceof Error ? err.message : 'Failed to load posts');
     } finally {
       setLoading(false);
     }
@@ -195,6 +200,12 @@ export default function LinkedInLibraryPage() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-16 rounded-md bg-muted animate-pulse" />
           ))}
+        </div>
+      ) : fetchError ? (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 text-sm text-destructive">
+          <p className="font-medium">Failed to load posts</p>
+          <p className="mt-1 text-xs opacity-80">{fetchError}</p>
+          <button onClick={fetchPosts} className="mt-2 text-xs underline">Retry</button>
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
