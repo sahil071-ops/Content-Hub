@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { LayoutGrid, List, Filter, Search, RefreshCw } from 'lucide-react';
+import { LayoutGrid, List, Filter, Search, RefreshCw, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,6 +10,7 @@ import { AccountBadge } from '@/components/linkedin/account-badge';
 import { EngagementBadge } from '@/components/linkedin/engagement-badge';
 import { FormatBadge } from '@/components/linkedin/format-badge';
 import { PostDetailPanel } from '@/components/linkedin/post-detail-panel';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import type { LinkedInPost, LinkedInAccount, LinkedInPostFormat } from '@/types/database';
 
@@ -140,6 +141,13 @@ export default function LinkedInLibraryPage() {
           >
             <LayoutGrid className="h-4 w-4" />
           </Button>
+          {isEditor && (
+            <Button asChild className="bg-[#2323A3] hover:bg-[#2323A3]/90">
+              <Link href="/linkedin/add">
+                <PlusCircle className="h-4 w-4 mr-1.5" />Add Post
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 

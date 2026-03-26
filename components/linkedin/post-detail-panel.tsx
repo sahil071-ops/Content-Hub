@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AccountBadge } from './account-badge';
 import { EngagementBadge } from './engagement-badge';
 import { FormatBadge } from './format-badge';
+import { TagInput } from '@/components/ui/tag-input';
 import { toast } from 'sonner';
 import type { LinkedInPost, LinkedInAccount } from '@/types/database';
 
@@ -222,26 +223,44 @@ export function PostDetailPanel({ post, accounts, accountAvg, onClose, onUpdated
           </div>
 
           {/* Tags */}
-          {(post.topic_tags.length > 0 || post.product_tags.length > 0) && (
-            <div className="space-y-2">
-              {post.topic_tags.length > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Topics</p>
-                  <div className="flex flex-wrap gap-1">
-                    {post.topic_tags.map((t) => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
-                  </div>
+          <div className="space-y-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Topic Tags</p>
+              {editing ? (
+                <TagInput
+                  types={['topic']}
+                  value={draft.topic_tags}
+                  onChange={(tags) => setDraft((d) => ({ ...d, topic_tags: tags }))}
+                  size="sm"
+                  placeholder="Add topic tags…"
+                />
+              ) : post.topic_tags.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {post.topic_tags.map((t) => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
                 </div>
-              )}
-              {post.product_tags.length > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Products</p>
-                  <div className="flex flex-wrap gap-1">
-                    {post.product_tags.map((t) => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
-                  </div>
-                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground italic">None</span>
               )}
             </div>
-          )}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Product Tags</p>
+              {editing ? (
+                <TagInput
+                  types={['product']}
+                  value={draft.product_tags}
+                  onChange={(tags) => setDraft((d) => ({ ...d, product_tags: tags }))}
+                  size="sm"
+                  placeholder="Add product tags…"
+                />
+              ) : post.product_tags.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {post.product_tags.map((t) => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
+                </div>
+              ) : (
+                <span className="text-xs text-muted-foreground italic">None</span>
+              )}
+            </div>
+          </div>
 
           {/* Screenshot */}
           {post.screenshot_url && (
