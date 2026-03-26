@@ -4,6 +4,7 @@ import { ContentGrid } from '@/components/content/content-grid';
 import { ContentFilters } from '@/components/content/content-filters';
 import { ContentSearch } from '@/components/content/content-search';
 import { ViewToggle, SortSelector } from '@/components/content/library-controls';
+import { PdfThumbnailGenerator } from '@/components/admin/pdf-thumbnail-generator';
 import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
 import Link from 'next/link';
@@ -120,6 +121,14 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const canUpload = ['admin', 'marketing'].includes(userRole);
   const currentSort = searchParams.sort || 'newest';
 
+  // Build list of PDF items missing thumbnails (for admin thumbnail generator)
+  const PDF_TYPES_SET = new Set(['pdf', 'ebook', 'whitepaper', 'catalogue', 'flier', 'presentation', 'emailer']);
+  const itemsMissingThumbnails = canUpload
+    ? (items || [])
+        .filter(i => PDF_TYPES_SET.has(i.content_type) && !i.thumbnail_url && i.file_url)
+        .map(i => ({ id: i.id, title: i.title, file_url: i.file_url!, content_type: i.content_type }))
+    : [];
+
   // Serialize searchParams for client components (avoids useSearchParams() suspension)
   const searchParamsStr = new URLSearchParams(
     Object.entries(searchParams).flatMap(([k, v]) =>
@@ -177,6 +186,13 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
               )}
             </div>
           </div>
+
+          {/* PDF thumbnail generator — visible to admins/marketing when PDFs are missing thumbnails */}
+          {canUpload && itemsMissingThumbnails.length > 0 && (
+            <div className="mb-4">
+              <PdfThumbnailGenerator items={itemsMissingThumbnails} />
+            </div>
+          )}
 
           {error ? (
             <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4 text-sm text-destructive">
