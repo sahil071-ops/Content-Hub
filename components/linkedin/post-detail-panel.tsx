@@ -1,22 +1,25 @@
 'use client';
 
 import { useState } from 'react';
-import { X, ExternalLink, Edit2, Save, X as XIcon } from 'lucide-react';
+import { X, ExternalLink, Edit2, Save, X as XIcon, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AccountBadge } from './account-badge';
 import { EngagementBadge } from './engagement-badge';
 import { FormatBadge } from './format-badge';
 import { toast } from 'sonner';
-import type { LinkedInPost } from '@/types/database';
+import type { LinkedInPost, LinkedInAccount } from '@/types/database';
 
 interface PostDetailPanelProps {
   post: LinkedInPost;
+  accounts: LinkedInAccount[];
   accountAvg?: number;
   onClose: () => void;
   onUpdated: (post: LinkedInPost) => void;
+  onDeleted: () => void;
   isEditor: boolean;
 }
 
@@ -30,10 +33,12 @@ const METRIC_FIELDS = [
   { key: 'link_clicks', label: 'Link Clicks' },
 ] as const;
 
-export function PostDetailPanel({ post, accountAvg, onClose, onUpdated, isEditor }: PostDetailPanelProps) {
+export function PostDetailPanel({ post, accounts, accountAvg, onClose, onUpdated, onDeleted, isEditor }: PostDetailPanelProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(post);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleSave() {
     setSaving(true);
@@ -43,15 +48,37 @@ export function PostDetailPanel({ post, accountAvg, onClose, onUpdated, isEditor
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft),
       });
-      if (!res.ok) throw new Error('Save failed');
-      const { post: updated } = await res.json();
-      onUpdated(updated);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Save failed');
+      onUpdated(data.post);
       setEditing(false);
       toast.success('Post updated');
-    } catch {
-      toast.error('Failed to save changes');
+    } catch (e) {
+      toast.error(`Failed to save post: ${(e as Error).message}`);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/linkedin/posts', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: post.id }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Delete failed');
+      }
+      toast.success('Post deleted');
+      onDeleted();
+    } catch (e) {
+      toast.error(`Failed to delete: ${(e as Error).message}`);
+      setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -65,14 +92,48 @@ export function PostDetailPanel({ post, accountAvg, onClose, onUpdated, isEditor
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b sticky top-0 bg-background z-10">
           <div className="flex items-center gap-3">
-            {post.account && <AccountBadge account={post.account} />}
+            {editing ? (
+              <Select
+                value={draft.account_id}
+                onValueChange={(val) => {
+                  const acc = accounts.find((a) => a.id === val);
+                  setDraft((d) => ({ ...d, account_id: val, account: acc ?? d.account }));
+                }}
+              >
+                <SelectTrigger className="h-8 text-xs w-44">
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              post.account && <AccountBadge account={post.account} />
+            )}
             <FormatBadge format={post.post_format} />
           </div>
           <div className="flex items-center gap-2">
             {isEditor && !editing && (
-              <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-                <Edit2 className="h-3.5 w-3.5 mr-1" />Edit
-              </Button>
+              <>
+                <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+                  <Edit2 className="h-3.5 w-3.5 mr-1" />Edit
+                </Button>
+                {confirmDelete ? (
+                  <>
+                    <span className="text-xs text-muted-foreground">Delete?</span>
+                    <Button size="sm" variant="destructive" onClick={handleDelete} disabled={deleting}>
+                      {deleting ? 'Deleting…' : 'Yes, delete'}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+                  </>
+                ) : (
+                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setConfirmDelete(true)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </>
             )}
             {editing && (
               <>
