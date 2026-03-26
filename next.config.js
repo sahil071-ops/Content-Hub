@@ -66,6 +66,17 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['node-html-parser'],
   },
+
+  // Emit pdf.js worker as a static asset — prevents Terser from trying to
+  // minify its ES module syntax as CommonJS and failing the build.
+  webpack: (config) => {
+    config.module.rules.push({
+      test: /pdf\.worker\.(min\.)?mjs$/,
+      type: 'asset/resource',
+      generator: { filename: 'static/media/[name].[hash][ext]' },
+    });
+    return config;
+  },
 };
 
 module.exports = nextConfig;
