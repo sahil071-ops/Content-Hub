@@ -102,6 +102,13 @@ export default function LinkedInLibraryPage() {
     setSelectedPost(updated);
   }
 
+  function handleDeleted() {
+    if (selectedPost) {
+      setPosts((prev) => prev.filter((p) => p.id !== selectedPost.id));
+    }
+    setSelectedPost(null);
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       {/* Header */}
@@ -211,9 +218,11 @@ export default function LinkedInLibraryPage() {
       {selectedPost && (
         <PostDetailPanel
           post={selectedPost}
+          accounts={accounts}
           accountAvg={accountAvgs[selectedPost.account_id]}
           onClose={() => setSelectedPost(null)}
           onUpdated={handleUpdated}
+          onDeleted={handleDeleted}
           isEditor={isEditor}
         />
       )}
