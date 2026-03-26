@@ -30,11 +30,9 @@ const PDF_CONTENT_TYPES = new Set([
  */
 async function generateThumbnailFromUrl(url: string): Promise<string> {
   const pdfjs = await import('pdfjs-dist');
-  // Use the locally bundled worker — CDN is unreliable and may have version mismatches
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url,
-  ).toString();
+  // Worker is copied to /public/pdf.worker.min.mjs by the prebuild script —
+  // serves as a plain static file so webpack/Terser never touch it.
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
   const res = await fetch(url, { mode: 'cors' });
   if (!res.ok) throw new Error(`Failed to fetch PDF: ${res.status}`);
