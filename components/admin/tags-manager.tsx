@@ -22,6 +22,7 @@ const TAG_TYPE_LABELS: Record<TagTypeEnum, string> = {
   medium: 'Platform / Medium',
   audience: 'Audience',
   content_type: 'Content Type',
+  language: 'Language',
 };
 
 const DEFAULT_COLORS = [

@@ -30,7 +30,7 @@ export type ContentStatusEnum = 'draft' | 'published' | 'archived';
 
 export type UserRoleEnum = 'admin' | 'marketing' | 'sales' | 'distributor' | 'viewer';
 
-export type TagTypeEnum = 'product' | 'topic' | 'audience' | 'content_type' | 'medium';
+export type TagTypeEnum = 'product' | 'topic' | 'audience' | 'content_type' | 'medium' | 'language';
 
 export type BackupStatusEnum = 'success' | 'failed' | 'pending';
 
@@ -75,6 +75,7 @@ export interface ContentItem {
   thumbnail_url: string | null;
   product_tags: string[];
   topic_tags: string[];
+  language_tags: string[];
   audience_tags: AudienceTagEnum[];
   medium_tags: string[];
   status: ContentStatusEnum;

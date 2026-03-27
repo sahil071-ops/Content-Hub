@@ -39,6 +39,7 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
   const productTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'product');
   const topicTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'topic');
   const mediumTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'medium');
+  const languageTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'language');
 
   // Fetch dynamic content types (gracefully handles pre-migration 004 state)
   const { data: contentTypesData } = await supabase
@@ -103,6 +104,7 @@ export default async function UploadPage({ searchParams }: UploadPageProps) {
           productTags={productTags}
           topicTags={topicTags}
           mediumTags={mediumTags}
+          languageTags={languageTags}
           userRole={userRole as 'admin' | 'marketing'}
           initialData={editItem}
           contentTypes={contentTypes.length > 0 ? contentTypes : undefined}

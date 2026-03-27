@@ -15,7 +15,7 @@ const STATUS_OPTIONS = [
   { value: 'published', label: 'Published' },
   { value: 'archived', label: 'Archived' },
 ];
-const FILTER_KEYS = ['type', 'product', 'topic', 'audience', 'status'] as const;
+const FILTER_KEYS = ['type', 'product', 'topic', 'language', 'audience', 'status'] as const;
 const SESSION_KEY = 'library-filters';
 
 function paramsToFilters(params: URLSearchParams): Record<string, string[]> {
@@ -30,11 +30,12 @@ function paramsToFilters(params: URLSearchParams): Record<string, string[]> {
 interface ContentFiltersProps {
   productTags: TagRow[];
   topicTags: TagRow[];
+  languageTags: TagRow[];
   userRole: UserRoleEnum;
   contentTypes?: ContentTypeRow[];
 }
 
-export function ContentFilters({ productTags, topicTags, userRole, contentTypes }: ContentFiltersProps) {
+export function ContentFilters({ productTags, topicTags, languageTags, userRole, contentTypes }: ContentFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -183,6 +184,21 @@ export function ContentFilters({ productTags, topicTags, userRole, contentTypes 
                     label={tag.name}
                     checked={isChecked('topic', tag.name)}
                     onChange={(checked) => updateFilter('topic', tag.name, checked)}
+                    color={tag.color}
+                  />
+                ))}
+              </FilterSection>
+            )}
+
+            {languageTags.length > 0 && (
+              <FilterSection title="Language">
+                {languageTags.map((tag) => (
+                  <FilterCheckbox
+                    key={tag.id}
+                    id={`language-${tag.id}`}
+                    label={tag.name}
+                    checked={isChecked('language', tag.name)}
+                    onChange={(checked) => updateFilter('language', tag.name, checked)}
                     color={tag.color}
                   />
                 ))}
