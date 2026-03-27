@@ -22,6 +22,7 @@ interface LibraryPageProps {
     product?: string | string[];
     topic?: string | string[];
     audience?: string | string[];
+    language?: string | string[];
     status?: string | string[];
     sort?: string;
     view?: string;

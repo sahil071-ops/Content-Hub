@@ -4,6 +4,9 @@
 -- Adds a dedicated language_tags column to content_items and
 -- migrates any existing topic tags that are language names.
 
+-- ── Add 'language' to tag_type enum ────────────────────────
+ALTER TYPE tag_type_enum ADD VALUE IF NOT EXISTS 'language';
+
 -- ── Add column ──────────────────────────────────────────────
 
 ALTER TABLE content_items
