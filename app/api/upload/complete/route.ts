@@ -15,7 +15,7 @@ async function getAuthedProfile(supabase: ReturnType<typeof createClient>) {
 
 // Check if an error is about a missing column (migration not yet run)
 function isMissingColumnError(msg: string): boolean {
-  return msg.includes('medium_tags') || msg.includes('file_urls') || msg.includes('schema cache');
+  return msg.includes('medium_tags') || msg.includes('language_tags') || msg.includes('file_urls') || msg.includes('schema cache');
 }
 
 export async function PATCH(request: NextRequest) {
@@ -35,9 +35,9 @@ export async function PATCH(request: NextRequest) {
 
     const {
       id, title, description, content_type, file_url, external_link,
-      thumbnail_url, product_tags, topic_tags, audience_tags, medium_tags,
+      thumbnail_url, product_tags, topic_tags, audience_tags, medium_tags, language_tags,
       file_size_bytes, file_type_mime, meta, status = 'draft', file_urls,
-    } = body;
+    } = body as any;
 
     if (!id) return NextResponse.json({ error: 'ID is required.' }, { status: 400 });
     if (!title) return NextResponse.json({ error: 'Title is required.' }, { status: 400 });
@@ -62,6 +62,7 @@ export async function PATCH(request: NextRequest) {
         published_at: status === 'published' ? (existing?.published_at || now) : null,
       };
       if (includeMediumTags) p.medium_tags = medium_tags || [];
+      if (includeMediumTags) p.language_tags = language_tags || [];
       if (includeFileUrls) p.file_urls = file_urls || [];
       if (file_url) p.file_url = file_url;
       if (external_link !== undefined) p.external_link = external_link || null;
@@ -119,9 +120,9 @@ export async function POST(request: NextRequest) {
 
     const {
       title, description, content_type, file_url, external_link,
-      thumbnail_url, product_tags, topic_tags, audience_tags, medium_tags,
+      thumbnail_url, product_tags, topic_tags, audience_tags, medium_tags, language_tags,
       file_size_bytes, file_type_mime, meta, status = 'draft', file_urls,
-    } = body;
+    } = body as any;
 
     if (!title) {
       return NextResponse.json({ error: 'Title is required.' }, { status: 400 });
@@ -140,6 +141,7 @@ export async function POST(request: NextRequest) {
       topic_tags: topic_tags || [],
       audience_tags: (audience_tags || []) as any,
       ...(includeMediumTags ? { medium_tags: medium_tags || [] } : {}),
+      ...(includeMediumTags ? { language_tags: language_tags || [] } : {}),
       ...(includeFileUrls ? { file_urls: file_urls || [] } : {}),
       status,
       published_at: status === 'published' ? now : null,

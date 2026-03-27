@@ -115,7 +115,23 @@ export function PostDetailPanel({ post, accounts, accountAvg, onClose, onUpdated
             ) : (
               post.account && <AccountBadge account={post.account} />
             )}
-            <FormatBadge format={post.post_format} />
+            {editing ? (
+              <Select
+                value={draft.post_format}
+                onValueChange={(val) => setDraft((d) => ({ ...d, post_format: val as any }))}
+              >
+                <SelectTrigger className="h-8 text-xs w-36">
+                  <SelectValue placeholder="Format" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(['text','image','video','carousel','document','poll','other'] as const).map((f) => (
+                    <SelectItem key={f} value={f} className="capitalize">{f === 'image' ? 'Photo / Image' : f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <FormatBadge format={post.post_format} />
+            )}
           </div>
           <div className="flex items-center gap-2">
             {isEditor && !editing && (

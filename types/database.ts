@@ -75,6 +75,7 @@ export interface ContentItem {
   thumbnail_url: string | null;
   product_tags: string[];
   topic_tags: string[];
+  language_tags: string[];
   audience_tags: AudienceTagEnum[];
   medium_tags: string[];
   status: ContentStatusEnum;

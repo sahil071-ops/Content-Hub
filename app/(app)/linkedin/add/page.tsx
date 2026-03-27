@@ -113,12 +113,31 @@ export default function LinkedInAddPage() {
     });
   }, []);
 
+  // ── Account detection from filename ─────────────────────────
+  function detectAccountFromFilename(filename: string): string {
+    // Strip extension, take first segment before _ or -
+    const base = filename.replace(/\.[^/.]+$/, '');
+    const segment = base.split(/[_\-\s]/)[0];
+    // Split CamelCase: "SahilKhandwala" → "Sahil Khandwala"
+    const normalized = segment
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+      .toLowerCase()
+      .trim();
+    const match = accounts.find((a) => {
+      const name = a.name.toLowerCase();
+      return name === normalized || name.replace(/\s+/g, '') === normalized.replace(/\s+/g, '');
+    });
+    return match?.id || '';
+  }
+
   // ── Mode A handlers ─────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
   const xlsxInputRef = useRef<HTMLInputElement>(null);
 
   async function handleXlsxUpload(file: File) {
-    setModeARow(r => ({ ...r, extracting: true }));
+    const detectedId = detectAccountFromFilename(file.name);
+    setModeARow(r => ({ ...r, extracting: true, ...(detectedId ? { account_id: detectedId } : {}) }));
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -172,7 +191,8 @@ export default function LinkedInAddPage() {
   }
 
   async function handleScreenshotUpload(file: File) {
-    setModeARow(r => ({ ...r, screenshot_file: file, screenshot_preview: URL.createObjectURL(file), extracting: true }));
+    const detectedId = detectAccountFromFilename(file.name);
+    setModeARow(r => ({ ...r, screenshot_file: file, screenshot_preview: URL.createObjectURL(file), extracting: true, ...(detectedId ? { account_id: detectedId } : {}) }));
 
     try {
       const formData = new FormData();

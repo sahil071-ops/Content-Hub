@@ -53,6 +53,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
 
   const productTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'product');
   const topicTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'topic');
+  const languageTags = (allTags || []).filter((t: TagRow) => t.tag_type === 'language');
 
   // Fetch dynamic content types (may not exist before migration 004)
   const { data: contentTypesData } = await supabase
@@ -99,6 +100,12 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const topics = toArray(searchParams.topic);
   if (topics.length > 0) {
     query = query.overlaps('topic_tags', topics);
+  }
+
+  // Language tag filter
+  const languages = toArray(searchParams.language);
+  if (languages.length > 0) {
+    query = query.overlaps('language_tags', languages);
   }
 
   // Audience filter (admin/marketing only)
@@ -155,6 +162,7 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
           <ContentFilters
             productTags={productTags}
             topicTags={topicTags}
+            languageTags={languageTags}
             userRole={userRole}
             contentTypes={contentTypes.length > 0 ? contentTypes : undefined}
           />

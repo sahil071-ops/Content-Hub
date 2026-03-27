@@ -319,6 +319,18 @@ export default async function ContentDetailPage({ params }: ContentDetailPagePro
             </div>
           )}
 
+          {/* Language tags */}
+          {(item as any).language_tags?.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Languages</p>
+              <div className="flex flex-wrap gap-1">
+                {(item as any).language_tags.map((tag: string) => (
+                  <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Audience */}
           {item.audience_tags.length > 0 && (
             <div className="space-y-2">

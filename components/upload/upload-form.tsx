@@ -42,6 +42,7 @@ const schema = z.object({
   topic_tags: z.array(z.string()).default([]),
   audience_tags: z.array(z.string()).default([]),
   medium_tags: z.array(z.string()).default([]),
+  language_tags: z.array(z.string()).default([]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -50,12 +51,13 @@ interface UploadFormProps {
   productTags: TagRow[];
   topicTags: TagRow[];
   mediumTags: TagRow[];
+  languageTags: TagRow[];
   userRole: 'admin' | 'marketing';
   initialData?: ContentItem | null;
   contentTypes?: ContentTypeRow[];
 }
 
-export function UploadForm({ productTags, topicTags, mediumTags, userRole, initialData, contentTypes }: UploadFormProps) {
+export function UploadForm({ productTags, topicTags, mediumTags, languageTags, userRole, initialData, contentTypes }: UploadFormProps) {
   // Build the list of content types to display — dynamic from DB or static fallback
   const contentTypeList = contentTypes && contentTypes.length > 0
     ? contentTypes.filter((t) => t.is_active).sort((a, b) => a.sort_order - b.sort_order)
@@ -92,7 +94,8 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
   const [allProductTags, setAllProductTags] = useState<TagRow[]>(productTags);
   const [allTopicTags, setAllTopicTags] = useState<TagRow[]>(topicTags);
   const [allMediumTags, setAllMediumTags] = useState<TagRow[]>(mediumTags);
-  const [newTagInput, setNewTagInput] = useState<{ type: 'product' | 'topic' | 'medium'; name: string; color: string } | null>(null);
+  const [allLanguageTags, setAllLanguageTags] = useState<TagRow[]>(languageTags);
+  const [newTagInput, setNewTagInput] = useState<{ type: 'product' | 'topic' | 'medium' | 'language'; name: string; color: string } | null>(null);
   const [tagCreating, setTagCreating] = useState(false);
 
   // ── Form ───────────────────────────────────────────────────────
@@ -113,6 +116,7 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
       topic_tags: initialData?.topic_tags || [],
       audience_tags: (initialData?.audience_tags || []) as string[],
       medium_tags: (initialData as any)?.medium_tags || [],
+      language_tags: (initialData as any)?.language_tags || [],
     },
   });
 
@@ -172,7 +176,7 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
     }
   }
 
-  function toggleArrayValue(field: 'product_tags' | 'topic_tags' | 'audience_tags' | 'medium_tags', value: string) {
+  function toggleArrayValue(field: 'product_tags' | 'topic_tags' | 'audience_tags' | 'medium_tags' | 'language_tags', value: string) {
     const current = watch(field) as string[];
     const updated = current.includes(value)
       ? current.filter((v) => v !== value)
@@ -214,6 +218,9 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
         } else if (newTagInput.type === 'medium') {
           setAllMediumTags(prev => [...prev, data as TagRow].sort((a, b) => a.name.localeCompare(b.name)));
           toggleArrayValue('medium_tags', data.name);
+        } else if (newTagInput.type === 'language') {
+          setAllLanguageTags(prev => [...prev, data as TagRow].sort((a, b) => a.name.localeCompare(b.name)));
+          toggleArrayValue('language_tags', data.name);
         } else {
           setAllTopicTags(prev => [...prev, data as TagRow].sort((a, b) => a.name.localeCompare(b.name)));
           toggleArrayValue('topic_tags', data.name);
@@ -325,6 +332,7 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
         file_size_bytes: file?.size ?? (isEdit ? initialData?.file_size_bytes ?? undefined : undefined),
         file_type_mime: file?.type ?? (isEdit ? initialData?.file_type ?? undefined : undefined),
         medium_tags: values.medium_tags,
+        language_tags: values.language_tags,
         meta,
       };
 
@@ -709,6 +717,57 @@ export function UploadForm({ productTags, topicTags, mediumTags, userRole, initi
             })}
             {allMediumTags.length === 0 && newTagInput?.type !== 'medium' && (
               <p className="text-xs text-muted-foreground">No platform tags yet. Click &quot;New tag&quot; to add one (e.g. Instagram, LinkedIn, Email).</p>
+            )}
+          </div>
+        </div>
+
+        {/* Language Tags */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Language</Label>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs gap-1"
+              onClick={() => setNewTagInput({ type: 'language', name: '', color: TAG_PRESET_COLORS[3] })}
+            >
+              <Plus className="h-3 w-3" /> New tag
+            </Button>
+          </div>
+
+          {newTagInput?.type === 'language' && (
+            <InlineTagForm
+              value={newTagInput}
+              onChange={(v) => setNewTagInput(prev => prev ? { ...prev, ...v } : null)}
+              onSubmit={createTag}
+              onCancel={() => setNewTagInput(null)}
+              loading={tagCreating}
+            />
+          )}
+
+          <div className="flex flex-wrap gap-2">
+            {allLanguageTags.map((tag) => {
+              const checked = (watch('language_tags') as string[]).includes(tag.name);
+              return (
+                <label
+                  key={tag.id}
+                  className={`flex items-center gap-1.5 cursor-pointer rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                    checked ? 'border-primary bg-primary/5 text-primary' : 'border-border hover:border-primary/50'
+                  }`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggleArrayValue('language_tags', tag.name)}
+                    className="h-3.5 w-3.5"
+                  />
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                  {tag.name}
+                </label>
+              );
+            })}
+            {allLanguageTags.length === 0 && newTagInput?.type !== 'language' && (
+              <p className="text-xs text-muted-foreground">No language tags yet. Click &quot;New tag&quot; to add one.</p>
             )}
           </div>
         </div>
