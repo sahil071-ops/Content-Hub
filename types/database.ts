@@ -30,7 +30,7 @@ export type ContentStatusEnum = 'draft' | 'published' | 'archived';
 
 export type UserRoleEnum = 'admin' | 'marketing' | 'sales' | 'distributor' | 'viewer';
 
-export type TagTypeEnum = 'product' | 'topic' | 'audience' | 'content_type' | 'medium';
+export type TagTypeEnum = 'product' | 'topic' | 'audience' | 'content_type' | 'medium' | 'language';
 
 export type BackupStatusEnum = 'success' | 'failed' | 'pending';
 
