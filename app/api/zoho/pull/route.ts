@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { fetchZohoLeads } from '@/lib/crm/zoho-client';
 import { analyseSpam, computeQualityScore, type FeedbackExample } from '@/lib/crm/spam-detector';
+import { verifyEmail } from '@/lib/crm/email-verifier';
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();
@@ -68,6 +69,23 @@ export async function POST(request: NextRequest) {
         if (is_spam)      results.spam++;
         if (is_high_value) results.high_value++;
 
+        const pulledAt = new Date().toISOString();
+        const submittedAt = rec.Created_Time ?? rec.Modified_Time ?? pulledAt;
+
+        // Email verification for non-spam leads (Abstract API, free tier)
+        let emailVerification: { email_valid?: boolean; email_disposable?: boolean; email_deliverable?: boolean } = {};
+        if (!is_spam && rec.Email && process.env.ABSTRACT_API_KEY) {
+          const verification = await verifyEmail(rec.Email);
+          if (verification) {
+            emailVerification = verification;
+            // Disposable email → downgrade score by one tier
+            if (verification.email_disposable) {
+              spam_reasons.push('Disposable email detected');
+              if (!is_spam && spam_score < 70) spam_score = Math.min(spam_score + 25, 69);
+            }
+          }
+        }
+
         const payload = {
           zoho_id:           rec.id,
           first_name:        rec.First_Name ?? null,
@@ -93,7 +111,10 @@ export async function POST(request: NextRequest) {
           raw_data:          rec as Record<string, unknown>,
           zoho_created_at:   rec.Created_Time ?? null,
           zoho_modified_at:  rec.Modified_Time ?? null,
-          pulled_at:         new Date().toISOString(),
+          pulled_at:         pulledAt,
+          submitted_at:      submittedAt,
+          date_estimated:    !rec.Created_Time,
+          ...emailVerification,
         };
 
         const { error } = await svc

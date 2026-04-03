@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { LayoutGrid, List, Filter, Search, RefreshCw, PlusCircle } from 'lucide-react';
+import { LayoutGrid, List, Filter, Search, RefreshCw, PlusCircle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,6 +40,16 @@ export default function LinkedInLibraryPage() {
   const [accountFilter, setAccountFilter] = useState('all');
   const [formatFilter, setFormatFilter] = useState('all');
   const [minEngagement, setMinEngagement] = useState('');
+
+  // Sorting
+  type SortKey = 'post_date' | 'impressions' | 'engagement_rate' | 'reactions' | 'comments' | 'shares';
+  const [sortBy, setSortBy] = useState<SortKey>('post_date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+
+  function handleSort(key: SortKey) {
+    if (sortBy === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortBy(key); setSortDir('desc'); }
+  }
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -92,16 +102,25 @@ export default function LinkedInLibraryPage() {
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
 
-  const filtered = posts.filter((p) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      p.post_text?.toLowerCase().includes(q) ||
-      p.account?.name?.toLowerCase().includes(q) ||
-      p.topic_tags.some((t) => t.toLowerCase().includes(q)) ||
-      p.product_tags.some((t) => t.toLowerCase().includes(q))
-    );
-  });
+  const filtered = posts
+    .filter((p) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        p.post_text?.toLowerCase().includes(q) ||
+        p.account?.name?.toLowerCase().includes(q) ||
+        p.topic_tags.some((t) => t.toLowerCase().includes(q)) ||
+        p.product_tags.some((t) => t.toLowerCase().includes(q))
+      );
+    })
+    .sort((a, b) => {
+      let aVal: number | string = 0, bVal: number | string = 0;
+      if (sortBy === 'post_date') { aVal = a.post_date || ''; bVal = b.post_date || ''; }
+      else { aVal = (a as any)[sortBy] ?? -1; bVal = (b as any)[sortBy] ?? -1; }
+      if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   function handleUpdated(updated: LinkedInPost) {
     setPosts((prev) => prev.map((p) => p.id === updated.id ? { ...p, ...updated } : p));
@@ -224,6 +243,9 @@ export default function LinkedInLibraryPage() {
           posts={filtered}
           accountAvgs={accountAvgs}
           onSelect={setSelectedPost}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSort={handleSort}
         />
       ) : (
         <CardView
@@ -250,29 +272,57 @@ export default function LinkedInLibraryPage() {
 }
 
 // ── Table view ──────────────────────────────────────────────────
+type SortKey = 'post_date' | 'impressions' | 'engagement_rate' | 'reactions' | 'comments' | 'shares';
+
+function SortIcon({ col, sortBy, sortDir }: { col: SortKey; sortBy: SortKey; sortDir: 'asc' | 'desc' }) {
+  if (col !== sortBy) return <ChevronsUpDown className="h-3 w-3 ml-1 inline opacity-40" />;
+  return sortDir === 'asc'
+    ? <ChevronUp className="h-3 w-3 ml-1 inline text-primary" />
+    : <ChevronDown className="h-3 w-3 ml-1 inline text-primary" />;
+}
+
 function TableView({
   posts,
   accountAvgs,
   onSelect,
+  sortBy,
+  sortDir,
+  onSort,
 }: {
   posts: LinkedInPost[];
   accountAvgs: Record<string, number>;
   onSelect: (p: LinkedInPost) => void;
+  sortBy: SortKey;
+  sortDir: 'asc' | 'desc';
+  onSort: (key: SortKey) => void;
 }) {
+  const thClass = "px-3 py-2 font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors";
   return (
     <div className="rounded-md border overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b bg-muted/30">
             <th className="text-left px-3 py-2 font-medium text-muted-foreground">Account</th>
-            <th className="text-left px-3 py-2 font-medium text-muted-foreground">Date</th>
+            <th className={`text-left ${thClass}`} onClick={() => onSort('post_date')}>
+              Date<SortIcon col="post_date" sortBy={sortBy} sortDir={sortDir} />
+            </th>
             <th className="text-left px-3 py-2 font-medium text-muted-foreground">Post</th>
             <th className="text-left px-3 py-2 font-medium text-muted-foreground hidden sm:table-cell">Type</th>
-            <th className="text-right px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Impressions</th>
-            <th className="text-right px-3 py-2 font-medium text-muted-foreground hidden sm:table-cell">Reactions</th>
-            <th className="text-right px-3 py-2 font-medium text-muted-foreground hidden md:table-cell">Comments</th>
-            <th className="text-right px-3 py-2 font-medium text-muted-foreground hidden lg:table-cell">Shares</th>
-            <th className="text-right px-3 py-2 font-medium text-muted-foreground">Eng. Rate</th>
+            <th className={`text-right hidden md:table-cell ${thClass}`} onClick={() => onSort('impressions')}>
+              Impressions<SortIcon col="impressions" sortBy={sortBy} sortDir={sortDir} />
+            </th>
+            <th className={`text-right hidden sm:table-cell ${thClass}`} onClick={() => onSort('reactions')}>
+              Reactions<SortIcon col="reactions" sortBy={sortBy} sortDir={sortDir} />
+            </th>
+            <th className={`text-right hidden md:table-cell ${thClass}`} onClick={() => onSort('comments')}>
+              Comments<SortIcon col="comments" sortBy={sortBy} sortDir={sortDir} />
+            </th>
+            <th className={`text-right hidden lg:table-cell ${thClass}`} onClick={() => onSort('shares')}>
+              Shares<SortIcon col="shares" sortBy={sortBy} sortDir={sortDir} />
+            </th>
+            <th className={`text-right ${thClass}`} onClick={() => onSort('engagement_rate')}>
+              Eng. Rate<SortIcon col="engagement_rate" sortBy={sortBy} sortDir={sortDir} />
+            </th>
           </tr>
         </thead>
         <tbody>

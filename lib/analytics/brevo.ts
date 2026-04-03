@@ -30,15 +30,20 @@ async function brevoGet(path: string): Promise<unknown> {
   const apiKey = process.env.BREVO_API_KEY;
   if (!apiKey) throw new Error('Missing BREVO_API_KEY');
 
-  const res = await fetch(`${BREVO_API_BASE}${path}`, {
+  const url = `${BREVO_API_BASE}${path}`;
+  const res = await fetch(url, {
     headers: {
-      'api-key': apiKey,
+      'api-key': apiKey,      // Brevo v3 API requires exactly this header name
       'Accept': 'application/json',
     },
   });
 
   if (!res.ok) {
-    throw new Error(`Brevo API error ${res.status}: ${await res.text()}`);
+    let body = '';
+    try { body = await res.text(); } catch { /* ignore */ }
+    throw new Error(
+      `Brevo API ${res.status} at ${path}: ${body.slice(0, 500)}`
+    );
   }
   return res.json();
 }

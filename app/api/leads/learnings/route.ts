@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { deriveLearnedRules } from '@/lib/crm/spam-detector';
+import type { FeedbackExample } from '@/lib/crm/spam-detector';
 
 /**
  * GET /api/leads/learnings
@@ -19,7 +21,7 @@ export async function GET() {
 
   const { data: allFeedback } = await svc
     .from('lead_feedback')
-    .select('feedback_type, original_decision, user_decision, user_note, created_at')
+    .select('feedback_type, original_decision, user_decision, user_note, created_at, lead:leads(first_name, last_name, email, company, title)')
     .order('created_at', { ascending: false });
 
   if (!allFeedback) return NextResponse.json({ error: 'Failed to load feedback' }, { status: 500 });
@@ -66,6 +68,17 @@ export async function GET() {
     ? Math.round((qualityConfirmations / qualityFeedback.length) * 100)
     : null;
 
+  // Derive learned rules from spam feedback examples
+  const spamFeedbackExamples: FeedbackExample[] = spamFeedback.map((f: any) => ({
+    name:          [f.lead?.first_name, f.lead?.last_name].filter(Boolean).join(' ') || null,
+    email:         f.lead?.email ?? null,
+    company:       f.lead?.company ?? null,
+    title:         f.lead?.title ?? null,
+    user_decision: f.user_decision,
+    user_note:     f.user_note ?? null,
+  }));
+  const derivedRules = deriveLearnedRules(spamFeedbackExamples);
+
   return NextResponse.json({
     total_feedback: allFeedback.length,
     spam: {
@@ -84,5 +97,6 @@ export async function GET() {
     not_spam_examples:  notSpamExamples.length,
     spam_examples:      spamExamples.length,
     quality_upgrades:   qualityUpgrades.length,
+    derived_rules:      derivedRules,
   });
 }

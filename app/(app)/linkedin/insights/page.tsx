@@ -38,6 +38,7 @@ export default function LinkedInInsightsPage() {
   const [accounts, setAccounts] = useState<LinkedInAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState('all');
   const [isEditor, setIsEditor] = useState(false);
 
@@ -77,6 +78,7 @@ export default function LinkedInInsightsPage() {
 
   async function handleGenerate() {
     setGenerating(true);
+    setGenerateError(null);
     try {
       const body: Record<string, any> = { period_days: 90 };
       if (selectedAccount !== 'all') body.account_id = selectedAccount;
@@ -86,12 +88,20 @@ export default function LinkedInInsightsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Failed to generate');
-      const { insights: newInsights } = await res.json();
+      const json = await res.json();
+      if (!res.ok) {
+        const errMsg = json.error || `HTTP ${res.status}`;
+        setGenerateError(errMsg);
+        toast.error('Failed to generate insights', { description: errMsg });
+        return;
+      }
+      const { insights: newInsights } = json;
       setInsights(prev => [...newInsights, ...prev]);
       toast.success(`${newInsights.length} new insight${newInsights.length !== 1 ? 's' : ''} generated`);
-    } catch {
-      toast.error('Failed to generate insights');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Network error';
+      setGenerateError(msg);
+      toast.error('Failed to generate insights', { description: msg });
     } finally {
       setGenerating(false);
     }
@@ -177,6 +187,17 @@ export default function LinkedInInsightsPage() {
           </div>
         )}
       </div>
+
+      {/* Generate error */}
+      {generateError && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3 text-sm text-destructive flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">Failed to generate insights</p>
+            <p className="text-xs mt-0.5 opacity-80">{generateError}</p>
+          </div>
+        </div>
+      )}
 
       {/* Post Suggestion panel */}
       {isEditor && (

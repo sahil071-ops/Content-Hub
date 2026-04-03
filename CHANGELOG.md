@@ -6,6 +6,66 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [v0.4.0] — 2026-04-03
+
+### Fixed — LinkedIn post dates
+- `emptyRow()` now defaults `post_date` to empty string instead of today's date
+- Date fields show a warning when the value is in the future or more than 3 years ago
+- Post Library table columns (Date, Impressions, Engagement Rate, Reactions, Comments, Shares) are now sortable; default sort is post date descending
+
+### Fixed — LinkedIn AI Insights payload size
+- API now sends only the 50 most recent posts to Claude; older posts are aggregated into a summary (count, avg engagement, top impressions per account)
+- Post summaries trimmed to essential fields + 300-char text preview to reduce token usage significantly
+- Insight generation errors are now surfaced in the UI (amber alert box) instead of silently failing
+
+### Fixed — AI lead scoring not learning from feedback
+- `deriveLearnedRules()` function added to `lib/crm/spam-detector.ts` — extracts hard rules (e.g. free-email domain bans) from user notes and injects them into the Claude prompt as strict constraints
+- Derived rules displayed on the AI Learnings page under "Derived Rules — Active Now"
+- Cron job (`/api/cron/process-leads`) re-applies derived rules to unreviewed leads every 15 minutes
+
+### Fixed — Zoho leads missing submission dates
+- `submitted_at` column added to `leads` table (migration 013), backfilled from `zoho_created_at → zoho_modified_at → pulled_at`
+- `date_estimated` boolean flag set when real submission date was unavailable
+- Lead Library sorted by `submitted_at` descending; estimated dates shown with an amber italic label
+- Supabase migration: `013_leads_submitted_at.sql`
+
+### Fixed — YouTube showing zeros for subscribers / watch time
+- Zero-value subscriber and watch-time cards are now hidden instead of showing confusing zeroes
+- When watch time is unavailable a "Requires YouTube account connection" message card is shown instead
+
+### Fixed — Brevo API connection errors
+- Error logging in `lib/analytics/brevo.ts` now includes URL path, HTTP status code, and first 500 chars of the response body for easier diagnosis
+
+### Added — Email verification via Abstract API
+- `lib/crm/email-verifier.ts` — calls `emailvalidation.abstractapi.com` to check deliverability, format validity, and disposable-domain status
+- `verifyEmail()` called on inbound Zoho leads when `ABSTRACT_API_KEY` env var is set
+- Disposable email addresses increment spam score by 25 and append a reason
+- Email verification badges shown in Lead Library (green tick, red shield, amber question mark)
+- Supabase migration: `014_lead_email_verification.sql`
+
+### Added — Language Tags
+- New `language` tag type for multi-language content tagging
+- Upload form, library filters, and content detail page all support language tags
+- Supabase migrations: `011_language_tags.sql`, `012_language_tags_data.sql`
+
+### Added — Vercel Cron Jobs
+- `/api/cron/pull-zoho-leads` — runs every 4 hours, delegates to `/api/zoho/pull`
+- `/api/cron/process-leads` — runs every 15 minutes, re-evaluates unreviewed leads with latest feedback and derived rules
+- Both routes protected by `CRON_SECRET` Bearer header
+- Schedules registered in `vercel.json`
+
+### Added — Main Dashboard (`/dashboard`)
+- New server page + client component replacing the default app home
+- **AI Highlights** section: 2-column expandable cards tagged WIN / PROBLEM / OPPORTUNITY / WATCH with thumbs feedback
+- **Number Strip**: 5 hero metrics (Organic Sessions, Search Clicks, YouTube Views, Email Open Rate, New Leads) with period-on-period delta arrows
+- **Detail Cards**: 5 collapsible sections (YouTube, Website/GA4, Spanish Site, Email/Brevo, Leads) showing full data breakdown
+- Period toggle: Weekly / Monthly / Quarterly / Annual
+- "Pull now" button to trigger a fresh data pull
+- Default app home (`app/(app)/page.tsx`) redirects to `/dashboard`
+- Dashboard link added to sidebar (admin / marketing roles)
+
+---
+
 ## [v0.3.0] — 2026-03-25
 
 ### Added — Favicon

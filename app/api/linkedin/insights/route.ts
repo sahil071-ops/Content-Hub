@@ -39,31 +39,50 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'ANTHROPIC_API_KEY not configured' }, { status: 500 });
 
-  // Fetch posts and accounts
+  // Fetch all posts (we'll slice ourselves for the payload)
   let postsQuery = supabase
     .from('linkedin_posts')
-    .select('*, account:linkedin_accounts(id, name, account_type)')
+    .select('id, account_id, post_date, post_format, post_text, impressions, reactions, comments, shares, engagement_rate, topic_tags, product_tags')
     .eq('status', 'published')
     .order('post_date', { ascending: false })
-    .limit(200);
+    .limit(500);
 
   if (account_id) postsQuery = postsQuery.eq('account_id', account_id);
   if (period_start) postsQuery = postsQuery.gte('post_date', period_start);
   if (period_end) postsQuery = postsQuery.lte('post_date', period_end);
 
-  const { data: posts } = await postsQuery;
-  const { data: accounts } = await supabase.from('linkedin_accounts').select('*').eq('is_active', true);
+  const { data: allPosts, error: postsError } = await postsQuery;
+  const { data: accounts } = await supabase.from('linkedin_accounts').select('id, name').eq('is_active', true);
 
-  if (!posts || posts.length === 0) {
+  if (postsError) return NextResponse.json({ error: `Failed to fetch posts: ${postsError.message}` }, { status: 500 });
+  if (!allPosts || allPosts.length === 0) {
     return NextResponse.json({ error: 'No posts found for the selected period' }, { status: 400 });
   }
 
-  // Build a compact data summary for Claude
   const accountNames = Object.fromEntries(
     (accounts || []).map((a: LinkedInAccount) => [a.id, a.name])
   );
 
-  const postSummaries = (posts as LinkedInPost[]).map((p) => ({
+  // Compute per-account averages across ALL posts
+  const accountStats: Record<string, { avg_engagement: number; post_count: number; top_posts: typeof allPosts }> = {};
+  for (const p of allPosts as LinkedInPost[]) {
+    const name = accountNames[p.account_id] || p.account_id;
+    if (!accountStats[name]) accountStats[name] = { avg_engagement: 0, post_count: 0, top_posts: [] };
+    if (p.engagement_rate) {
+      accountStats[name].avg_engagement = (accountStats[name].avg_engagement * accountStats[name].post_count + p.engagement_rate) / (accountStats[name].post_count + 1);
+    }
+    accountStats[name].post_count++;
+    if (accountStats[name].top_posts.length < 3 && (p.engagement_rate ?? 0) > 0) {
+      accountStats[name].top_posts.push(p);
+    }
+  }
+
+  // Limit to 50 most recent posts for the payload
+  const MAX_POSTS = 50;
+  const recentPosts = (allPosts as LinkedInPost[]).slice(0, MAX_POSTS);
+  const olderPosts = (allPosts as LinkedInPost[]).slice(MAX_POSTS);
+
+  const postSummaries = recentPosts.map((p) => ({
     id: p.id,
     account: accountNames[p.account_id] || p.account_id,
     date: p.post_date,
@@ -74,28 +93,30 @@ export async function POST(request: NextRequest) {
     shares: p.shares,
     engagement_rate: p.engagement_rate,
     topic_tags: p.topic_tags,
-    product_tags: p.product_tags,
-    text_preview: p.post_text ? p.post_text.slice(0, 200) : null,
+    text_preview: p.post_text ? p.post_text.slice(0, 300) : null,
   }));
 
-  // Compute per-account averages for context
-  const accountStats: Record<string, { avg_engagement: number; post_count: number }> = {};
-  for (const p of posts as LinkedInPost[]) {
-    const name = accountNames[p.account_id] || p.account_id;
-    if (!accountStats[name]) accountStats[name] = { avg_engagement: 0, post_count: 0 };
-    if (p.engagement_rate) {
-      accountStats[name].avg_engagement = (accountStats[name].avg_engagement * accountStats[name].post_count + p.engagement_rate) / (accountStats[name].post_count + 1);
+  // Aggregate older posts as summary stats
+  const olderSummary = olderPosts.length > 0 ? (() => {
+    const byAccount: Record<string, { count: number; avg_eng: number; top_impressions: number }> = {};
+    for (const p of olderPosts) {
+      const name = accountNames[p.account_id] || p.account_id;
+      if (!byAccount[name]) byAccount[name] = { count: 0, avg_eng: 0, top_impressions: 0 };
+      byAccount[name].count++;
+      if (p.engagement_rate) byAccount[name].avg_eng = (byAccount[name].avg_eng * (byAccount[name].count - 1) + p.engagement_rate) / byAccount[name].count;
+      if ((p.impressions ?? 0) > byAccount[name].top_impressions) byAccount[name].top_impressions = p.impressions ?? 0;
     }
-    accountStats[name].post_count++;
-  }
+    return Object.entries(byAccount).map(([name, s]) => `${name}: ${s.count} older posts, avg eng ${s.avg_eng.toFixed(2)}%, top impressions ${s.top_impressions.toLocaleString()}`).join('; ');
+  })() : null;
 
   const prompt = `You are a LinkedIn performance analyst for Axis, an electrical products B2B company.
-Analyse the following LinkedIn post data from ${posts.length} posts across ${Object.keys(accountStats).length} account(s).
+Analyse the following LinkedIn post data. Total: ${allPosts.length} posts across ${Object.keys(accountStats).length} account(s).
 
-ACCOUNT AVERAGES:
+ACCOUNT AVERAGES (all ${allPosts.length} posts):
 ${Object.entries(accountStats).map(([name, s]) => `- ${name}: avg engagement ${s.avg_engagement.toFixed(2)}%, ${s.post_count} posts`).join('\n')}
+${olderSummary ? `\nOLDER POSTS SUMMARY (${olderPosts.length} posts prior to the 50 shown below):\n${olderSummary}` : ''}
 
-POST DATA (most recent first):
+POST DATA — 50 most recent:
 ${JSON.stringify(postSummaries, null, 2)}
 
 Generate 5–7 insights. Each insight must be a JSON object with:

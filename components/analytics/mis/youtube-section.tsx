@@ -31,13 +31,7 @@ export function YouTubeSection({ data }: YouTubeSectionProps) {
       <p className="text-sm text-muted-foreground italic border-l-4 border-red-500 pl-3 py-1">{summary}</p>
 
       {/* Hero + secondary metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {/* Hero */}
-        <div className="col-span-2 sm:col-span-1 rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Channel Subscribers</p>
-          <p className="text-3xl font-bold">{fmt(data.net_subscribers)}</p>
-          <p className="text-xs text-muted-foreground mt-1">Total subscriber count</p>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className="rounded-lg border bg-card p-4">
           <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Views This Period</p>
           <p className="text-2xl font-bold">{fmt(data.views)}</p>
@@ -47,15 +41,18 @@ export function YouTubeSection({ data }: YouTubeSectionProps) {
           <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Avg Views / Video</p>
           <p className="text-2xl font-bold">{fmt(avgViews)}</p>
         </div>
-        <div className="rounded-lg border bg-card p-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Watch Time</p>
-          <p className="text-2xl font-bold">
-            {data.watch_time_minutes > 0 ? `${Math.round(data.watch_time_minutes / 60)}h` : '—'}
-          </p>
-          {data.watch_time_minutes === 0 && (
-            <p className="text-xs text-muted-foreground mt-1">Requires YouTube Analytics OAuth</p>
-          )}
-        </div>
+        {data.watch_time_minutes > 0 ? (
+          <div className="rounded-lg border bg-card p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Watch Time</p>
+            <p className="text-2xl font-bold">{Math.round(data.watch_time_minutes / 60)}h</p>
+          </div>
+        ) : (
+          <div className="rounded-lg border bg-card/50 p-4 flex items-center">
+            <p className="text-xs text-muted-foreground">
+              Subscriber &amp; watch time data requires YouTube account connection — set up in Admin Settings.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Top 5 videos — visual bar-list */}

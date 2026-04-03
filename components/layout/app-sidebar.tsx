@@ -39,6 +39,12 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   {
+    label: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    roles: ['admin', 'marketing'],
+  },
+  {
     label: 'Content Library',
     href: '/library',
     icon: Library,

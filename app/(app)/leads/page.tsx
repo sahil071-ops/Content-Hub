@@ -5,7 +5,8 @@ import {
   Search, RefreshCw, Loader2, ShieldAlert, Star, Users,
   ChevronDown, ChevronUp, Sparkles, ThumbsUp, ThumbsDown,
   Phone, Mail, Globe, Building2, Briefcase, MapPin,
-  CheckCircle2, XCircle, TrendingUp, AlertTriangle, Linkedin,
+  CheckCircle2, XCircle, TrendingUp, AlertTriangle, Linkedin, Calendar,
+  ShieldCheck as VerifiedIcon, ShieldAlert as DisposableIcon, HelpCircle as UnknownEmailIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -320,6 +321,15 @@ function LeadCard({
             {lead.email && (
               <span className="text-xs text-muted-foreground hidden sm:flex items-center gap-1">
                 <Mail className="h-3 w-3" />{lead.email}
+                {lead.email_deliverable === true && lead.email_disposable === false && (
+                  <VerifiedIcon className="h-3 w-3 text-emerald-500" title="Email verified deliverable" />
+                )}
+                {lead.email_disposable === true && (
+                  <DisposableIcon className="h-3 w-3 text-red-500" title="Disposable email" />
+                )}
+                {lead.email_deliverable === false && lead.email_disposable !== true && (
+                  <UnknownEmailIcon className="h-3 w-3 text-amber-500" title="Email undeliverable" />
+                )}
               </span>
             )}
           </div>
@@ -351,6 +361,15 @@ function LeadCard({
             {lead.email && (
               <a href={`mailto:${lead.email}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
                 <Mail className="h-4 w-4 shrink-0" />{lead.email}
+                {lead.email_deliverable === true && lead.email_disposable === false && (
+                  <span className="text-xs text-emerald-500 font-medium flex items-center gap-0.5"><VerifiedIcon className="h-3 w-3" />Verified</span>
+                )}
+                {lead.email_disposable === true && (
+                  <span className="text-xs text-red-500 font-medium flex items-center gap-0.5"><DisposableIcon className="h-3 w-3" />Disposable</span>
+                )}
+                {lead.email_deliverable === false && lead.email_disposable !== true && (
+                  <span className="text-xs text-amber-500 font-medium flex items-center gap-0.5"><UnknownEmailIcon className="h-3 w-3" />Undeliverable</span>
+                )}
               </a>
             )}
             {/* Company domain derived from email — opens company website */}
@@ -385,6 +404,15 @@ function LeadCard({
             {lead.country && (
               <span className="flex items-center gap-2 text-muted-foreground">
                 <MapPin className="h-4 w-4 shrink-0" />{lead.country}
+              </span>
+            )}
+            {(lead as any).submitted_at && (
+              <span className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-4 w-4 shrink-0" />
+                {new Date((lead as any).submitted_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                {(lead as any).date_estimated && (
+                  <span className="text-xs text-amber-500 italic ml-1">(Date estimated)</span>
+                )}
               </span>
             )}
             {/* LinkedIn people search — only for non-spam leads with name + company */}

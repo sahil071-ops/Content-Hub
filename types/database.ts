@@ -458,6 +458,11 @@ export interface Lead {
   zoho_created_at: string | null;
   zoho_modified_at: string | null;
   pulled_at: string;
+  submitted_at: string | null;
+  date_estimated: boolean;
+  email_valid: boolean | null;
+  email_disposable: boolean | null;
+  email_deliverable: boolean | null;
   created_at: string;
   updated_at: string;
   // Joined

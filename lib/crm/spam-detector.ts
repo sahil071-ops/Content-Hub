@@ -103,6 +103,56 @@ function heuristicScore(r: ZohoLeadRecord): { score: number; reasons: string[] }
   return { score: Math.min(score, 100), reasons };
 }
 
+/**
+ * Derive concrete hard rules from user feedback notes.
+ * Looks for patterns: free email domains, company types, industries.
+ */
+export function deriveLearnedRules(feedbackExamples: FeedbackExample[]): string[] {
+  const rules: string[] = [];
+  const domainRules = new Set<string>();
+  const notePatterns: string[] = [];
+
+  for (const ex of feedbackExamples) {
+    // Extract domain rules from notes mentioning domains
+    if (ex.user_note) {
+      const note = ex.user_note.toLowerCase();
+      // Match "gmail.com", "yahoo.com" etc in notes
+      const domainMatch = note.match(/\b([a-z0-9-]+\.(com|in|net|org|co\.in|co\.uk))\b/g);
+      if (domainMatch) {
+        for (const d of domainMatch) {
+          if (ex.user_decision) {
+            // User marked as spam and mentioned a domain → domain rule
+            domainRules.add(d);
+          }
+        }
+      }
+      notePatterns.push(`${ex.user_decision ? 'SPAM' : 'LEGITIMATE'}: "${ex.user_note}"`);
+    }
+    // Extract domain from email if user said spam
+    if (ex.user_decision && ex.email) {
+      const emailDomain = ex.email.split('@')[1]?.toLowerCase();
+      if (emailDomain && (FREE_DOMAINS.has(emailDomain) || notePatterns.some(n => n.includes(emailDomain)))) {
+        domainRules.add(emailDomain);
+      }
+    }
+  }
+
+  if (domainRules.size > 0) {
+    rules.push(`Free/personal email domains (${[...domainRules].join(', ')}) must NEVER be classified as high-value, regardless of other signals`);
+  }
+
+  // Add rules derived from recurring patterns in notes
+  const spamNotes = feedbackExamples
+    .filter(e => e.user_decision && e.user_note)
+    .map(e => e.user_note!)
+    .slice(0, 5);
+  if (spamNotes.length >= 2) {
+    rules.push(`The sales team has flagged these as spam patterns: ${spamNotes.map(n => `"${n}"`).join('; ')}`);
+  }
+
+  return rules;
+}
+
 async function claudeClassify(
   r: ZohoLeadRecord,
   feedbackExamples: FeedbackExample[] = [],
@@ -119,6 +169,13 @@ async function claudeClassify(
     lead_source: r.Lead_Source,
     description: r.Description?.slice(0, 300),
   }, null, 2);
+
+  // Derive hard rules from feedback
+  const learnedRules = deriveLearnedRules(feedbackExamples);
+  let learnedRulesBlock = '';
+  if (learnedRules.length > 0) {
+    learnedRulesBlock = `\n\nLEARNED RULES FROM USER FEEDBACK (these override your defaults — apply them strictly):\n${learnedRules.map(r => `- ${r}`).join('\n')}\n`;
+  }
 
   // Build few-shot examples from past team corrections
   let trainingBlock = '';
@@ -144,7 +201,7 @@ async function claudeClassify(
     max_tokens: 150,
     messages: [{
       role: 'user',
-      content: `You are a B2B lead quality analyst for Axis Electrical Products (manufacturer of MCBs, RCDs, switchgear, cable management). Determine if this CRM lead is SPAM or legitimate.${trainingBlock}
+      content: `You are a B2B lead quality analyst for Axis Electrical Products (manufacturer of MCBs, RCDs, switchgear, cable management). Determine if this CRM lead is SPAM or legitimate.${learnedRulesBlock}${trainingBlock}
 
 Lead to classify:
 ${leadSummary}
