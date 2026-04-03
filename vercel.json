@@ -1,20 +1,9 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/mis?period=weekly",
-      "schedule": "30 0 * * 1"
-    },
-    {
-      "path": "/api/cron/mis?period=monthly",
-      "schedule": "30 0 1 * *"
-    },
-    {
-      "path": "/api/cron/mis?period=quarterly",
-      "schedule": "30 0 1 1,4,7,10 *"
-    },
-    {
-      "path": "/api/cron/mis?period=annual",
-      "schedule": "30 0 1 1 *"
-    }
+    { "path": "/api/cron/mis?period=weekly",    "schedule": "0 1 * * 1" },
+    { "path": "/api/cron/mis?period=monthly",   "schedule": "0 2 1 * *" },
+    { "path": "/api/cron/mis?period=quarterly", "schedule": "0 3 1 1,4,7,10 *" },
+    { "path": "/api/cron/mis?period=annual",    "schedule": "0 4 1 1 *" },
+    { "path": "/api/cron/pull-zoho-leads",      "schedule": "0 2 * * *" }
   ]
 }

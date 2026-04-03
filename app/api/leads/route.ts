@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from('leads')
     .select('*, enrichment:lead_enrichments(*)', { count: 'exact' })
-    .order('pulled_at', { ascending: false })
+    .order('submitted_at', { ascending: false, nullsFirst: false })
     .range(offset, offset + limit - 1);
 
   if (view === 'spam')       query = query.eq('is_spam', true);

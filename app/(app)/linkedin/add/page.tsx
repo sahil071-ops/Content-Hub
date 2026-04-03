@@ -25,6 +25,17 @@ const FORMAT_OPTIONS: { value: LinkedInPostFormat; label: string }[] = [
   { value: 'other',     label: 'Other' },
 ];
 
+function getDateWarning(dateStr: string): string | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  const now = new Date();
+  if (d > now) return 'Post date is in the future — please verify.';
+  const threeYearsAgo = new Date(now);
+  threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+  if (d < threeYearsAgo) return 'Post date is more than 3 years ago — please verify.';
+  return null;
+}
+
 interface PostRow {
   id: string;
   account_id: string;
@@ -54,7 +65,7 @@ function emptyRow(): PostRow {
     id: Math.random().toString(36).slice(2),
     account_id: '',
     post_url: '',
-    post_date: new Date().toISOString().split('T')[0],
+    post_date: '',
     post_text: '',
     post_format: 'text',
     impressions: '',
@@ -431,6 +442,10 @@ export default function LinkedInAddPage() {
                     value={modeARow.post_date}
                     onChange={e => setModeARow(r => ({ ...r, post_date: e.target.value }))}
                   />
+                  {modeARow.post_date && (() => {
+                    const warn = getDateWarning(modeARow.post_date);
+                    return warn ? <p className="text-xs text-amber-500">{warn}</p> : null;
+                  })()}
                 </div>
                 <div className="space-y-1">
                   <Label>Content Type</Label>
@@ -626,6 +641,9 @@ function BulkPostRow({
                 onChange={e => onChange({ post_date: e.target.value })}
                 className="h-8 text-xs"
               />
+              {row.post_date && getDateWarning(row.post_date) && (
+                <p className="text-[10px] text-amber-500">{getDateWarning(row.post_date)}</p>
+              )}
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Content Type</Label>

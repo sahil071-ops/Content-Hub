@@ -67,6 +67,18 @@ const nextConfig = {
     serverComponentsExternalPackages: ['node-html-parser'],
   },
 
+  // Redirect root to dashboard — avoids a page.tsx that generates a broken
+  // nft.json reference to a missing page_client-reference-manifest.js on Vercel.
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/dashboard',
+        permanent: false,
+      },
+    ];
+  },
+
 };
 
 module.exports = nextConfig;

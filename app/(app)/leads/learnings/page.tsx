@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Brain, RefreshCw, Loader2, Pencil, Check, X,
-  ShieldAlert, Star, ShieldCheck, StarOff, Trash2,
+  ShieldAlert, Star, ShieldCheck, StarOff, Trash2, BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,7 @@ function wasOverride(e: FeedbackEntry) {
 
 export default function AiLearningsPage() {
   const [entries, setEntries]       = useState<FeedbackEntry[]>([]);
+  const [derivedRules, setDerivedRules] = useState<string[]>([]);
   const [loading, setLoading]       = useState(true);
   const [reevaluating, setReevaluating] = useState(false);
   const [editingId, setEditingId]   = useState<string | null>(null);
@@ -59,12 +60,14 @@ export default function AiLearningsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [feedbackRes, meRes] = await Promise.all([
+      const [feedbackRes, meRes, learningsRes] = await Promise.all([
         fetch('/api/leads/feedback'),
         fetch('/api/me'),
+        fetch('/api/leads/learnings'),
       ]);
       if (feedbackRes.ok) setEntries((await feedbackRes.json()).feedback ?? []);
       if (meRes.ok) setUserRole((await meRes.json()).role ?? '');
+      if (learningsRes.ok) setDerivedRules((await learningsRes.json()).derived_rules ?? []);
     } finally {
       setLoading(false);
     }
@@ -153,6 +156,25 @@ export default function AiLearningsPage() {
           </Button>
         )}
       </div>
+
+      {/* Derived Rules */}
+      {!loading && derivedRules.length > 0 && (
+        <div className="rounded-lg border bg-card p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4 text-purple-500" />
+            <p className="text-sm font-semibold">Derived Rules — Active Now</p>
+          </div>
+          <p className="text-xs text-muted-foreground">These are the concrete rules the AI is applying to every classification, derived from your feedback:</p>
+          <ul className="space-y-1.5 mt-1">
+            {derivedRules.map((rule, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm">
+                <span className="text-purple-500 shrink-0 font-bold mt-0.5">→</span>
+                <span>{rule}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Stats row */}
       {!loading && entries.length > 0 && (
