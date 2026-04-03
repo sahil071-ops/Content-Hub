@@ -5,8 +5,10 @@ import type { ZohoLeadRecord } from '@/lib/crm/zoho-client';
 
 /**
  * GET /api/cron/process-leads
- * Runs every 15 minutes via Vercel Cron.
- * Re-evaluates unreviewed leads using the latest feedback, applying derived rules.
+ * Manual trigger only — removed from vercel.json cron schedule (exceeded Hobby plan limit).
+ * WPForms leads are now processed synchronously in /api/leads/wpforms.
+ * Zoho leads are processed inline during the daily /api/cron/pull-zoho-leads run.
+ * This route remains available for ad-hoc re-evaluation (call manually or via admin UI).
  */
 export const maxDuration = 300;
 

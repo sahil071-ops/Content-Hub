@@ -95,8 +95,9 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 /api/leads/feedback           → GET: all feedback records
 /api/leads/learnings          → GET: derived rules + feedback summary
 /api/cron/mis                 → GET: pull analytics (period= param)
-/api/cron/process-leads       → GET: re-evaluate unreviewed leads
-/api/cron/pull-zoho-leads     → GET: delegate to /api/zoho/pull
+/api/leads/wpforms            → POST: WPForms webhook, processes lead synchronously
+/api/cron/process-leads       → GET: manual ad-hoc re-evaluation (not in cron schedule)
+/api/cron/pull-zoho-leads     → GET: daily Zoho pull (2:00 AM UTC)
 ```
 
 ---
@@ -158,6 +159,7 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 | `ZOHO_CLIENT_SECRET` | Zoho OAuth app client secret | ⚠️ Optional |
 | `ZOHO_REDIRECT_URI` | Zoho OAuth callback URL | ⚠️ Optional |
 | `ABSTRACT_API_KEY` | Abstract API email verification | ⚠️ Optional — email badges won't show (100/day free) |
+| `WPFORMS_WEBHOOK_SECRET` | Shared secret for WPForms webhook auth | ⚠️ Optional but strongly recommended in production |
 
 ---
 
@@ -205,8 +207,9 @@ app/(app)/linkedin/add/page.tsx            → Add posts with date validation
 app/api/analytics/pull/route.ts            → Orchestrates all analytics source pulls
 app/api/zoho/pull/route.ts                 → Pulls leads from Zoho, email verify, spam score
 app/api/linkedin/insights/route.ts         → Claude insights (capped 50 posts)
-app/api/cron/process-leads/route.ts        → Re-evaluates unreviewed leads every 15 min
-app/api/cron/pull-zoho-leads/route.ts      → Delegates Zoho pull every 4 hours
+app/api/leads/wpforms/route.ts             → WPForms webhook: saves lead, runs spam/quality sync
+app/api/cron/process-leads/route.ts        → Manual re-evaluation trigger (not a registered cron)
+app/api/cron/pull-zoho-leads/route.ts      → Delegates Zoho pull, runs once daily at 2:00 AM UTC
 lib/storage/r2.ts                          → Cloudflare R2 client, presign, upload, delete
 lib/storage/b2.ts                          → Backblaze B2 client, backup upload
 lib/analytics/ga4.ts                       → GA4 data fetch (sessions, countries, timeline)
@@ -225,7 +228,7 @@ components/analytics/mis/mis-dashboard-client.tsx → MIS dashboard state and la
 components/analytics/ai-highlights-panel.tsx → Highlight cards with thumbs feedback
 types/database.ts                          → All TypeScript types for DB rows and enums
 supabase/migrations/                       → All 14 SQL migrations, run in order
-vercel.json                                → Cron job schedules (6 jobs)
+vercel.json                                → Cron job schedules (5 jobs, all once/day or less)
 ```
 
 ---
@@ -257,3 +260,4 @@ vercel.json                                → Cron job schedules (6 jobs)
 | Date | Version | Changes |
 |------|---------|---------|
 | 2026-04-03 | v0.4.0 | Fixed 6 bugs (LinkedIn dates/payload/AI rules/Zoho dates/YouTube zeros/Brevo errors); added email verification via Abstract API; added language tags; added Vercel cron jobs; rebuilt /dashboard with AI highlights + number strip + detail cards; added PROJECT_DOCS.md |
+| 2026-04-03 | v0.4.0 | Fixed Vercel Hobby plan cron limit: removed process-leads (*/15) and pull-zoho-leads (*/4h) from schedule; added /api/leads/wpforms webhook for synchronous WPForms lead processing; Zoho pull moved to once daily (0 2 * * *); 5 crons remain, all ≤ once/day |
