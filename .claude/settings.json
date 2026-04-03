@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "if ! npx tsc --noEmit 2>/dev/null; then echo '{\"continue\":false,\"stopReason\":\"TypeScript errors found — fix before committing. Run: npx tsc --noEmit\"}'; fi",
+            "timeout": 60,
+            "statusMessage": "Checking TypeScript before commit..."
+          }
+        ]
+      }
+    ]
+  }
+}

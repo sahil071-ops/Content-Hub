@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
   }
 
   const accountNames = Object.fromEntries(
-    (accounts || []).map((a: LinkedInAccount) => [a.id, a.name])
+    (accounts || []).map((a: Pick<LinkedInAccount, 'id' | 'name'>) => [a.id, a.name])
   );
 
   // Compute per-account averages across ALL posts

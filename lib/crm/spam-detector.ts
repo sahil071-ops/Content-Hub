@@ -138,7 +138,7 @@ export function deriveLearnedRules(feedbackExamples: FeedbackExample[]): string[
   }
 
   if (domainRules.size > 0) {
-    rules.push(`Free/personal email domains (${[...domainRules].join(', ')}) must NEVER be classified as high-value, regardless of other signals`);
+    rules.push(`Free/personal email domains (${Array.from(domainRules).join(', ')}) must NEVER be classified as high-value, regardless of other signals`);
   }
 
   // Add rules derived from recurring patterns in notes
