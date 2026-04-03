@@ -405,7 +405,8 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Top Countries</p>
                       <RechartsBar
                         data={ga4.top_countries.slice(0, 5).map((c: any) => ({ name: c.country, value: c.sessions }))}
-                        bars={[{ key: 'value', label: 'Sessions', color: '#3B82F6' }]}
+                        color="#3B82F6"
+                        label="Sessions"
                         height={140}
                       />
                     </div>
@@ -606,7 +607,8 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
                   { name: 'High Value', value: leads.high_value },
                   { name: 'Spam',       value: leads.spam },
                 ]}
-                bars={[{ key: 'value', label: 'Leads', color: '#8B5CF6' }]}
+                color="#8B5CF6"
+                label="Leads"
                 height={120}
               />
             )}
