@@ -322,13 +322,13 @@ function LeadCard({
               <span className="text-xs text-muted-foreground hidden sm:flex items-center gap-1">
                 <Mail className="h-3 w-3" />{lead.email}
                 {lead.email_deliverable === true && lead.email_disposable === false && (
-                  <VerifiedIcon className="h-3 w-3 text-emerald-500" title="Email verified deliverable" />
+                  <span title="Email verified deliverable"><VerifiedIcon className="h-3 w-3 text-emerald-500" /></span>
                 )}
                 {lead.email_disposable === true && (
-                  <DisposableIcon className="h-3 w-3 text-red-500" title="Disposable email" />
+                  <span title="Disposable email"><DisposableIcon className="h-3 w-3 text-red-500" /></span>
                 )}
                 {lead.email_deliverable === false && lead.email_disposable !== true && (
-                  <UnknownEmailIcon className="h-3 w-3 text-amber-500" title="Email undeliverable" />
+                  <span title="Email undeliverable"><UnknownEmailIcon className="h-3 w-3 text-amber-500" /></span>
                 )}
               </span>
             )}
