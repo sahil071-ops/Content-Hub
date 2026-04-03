@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     for (const rec of records) {
       try {
-        const { spam_score, is_spam, spam_reasons } = await analyseSpam(rec, feedbackExamples);
+        let { spam_score, is_spam, spam_reasons } = await analyseSpam(rec, feedbackExamples);
         // Spam and high-value are mutually exclusive by definition
         const quality_score = is_spam ? 0 : computeQualityScore({
           email:   rec.Email,
