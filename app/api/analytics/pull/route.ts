@@ -160,14 +160,9 @@ async function runPull(periodType: MisPeriodTypeEnum, serviceSupabase: ReturnTyp
   }
 
   // ── Generate AI highlights ─────────────────────────────────
-  if (results.length > 0 && process.env.ANTHROPIC_API_KEY) {
+  if (process.env.ANTHROPIC_API_KEY) {
     try {
-      const highlights = await generateMisHighlights(
-        results as Parameters<typeof generateMisHighlights>[0],
-        periodType,
-        startDate,
-        endDate
-      );
+      const highlights = await generateMisHighlights(serviceSupabase, periodType);
 
       await serviceSupabase.from('mis_highlights').insert({
         period_start: startDate,

@@ -8,6 +8,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — AI Insights using snapshot history (Part 5)
+- `generateMisHighlights()` rewritten to query `metric_snapshots` directly instead of accepting raw pull results
+- New signature: `generateMisHighlights(serviceClient, periodType)` — fetches the last 8 weekly (or monthly) periods from `metric_snapshots`, groups by `period_start`, and builds a multi-period text summary for Claude
+- Summary format: one line per period — `Week of [date]: GA4 sessions X (main: A, ES: B) | GSC clicks Y / impressions Z / CTR P% | YouTube V views, S subscribers | Brevo open rate R% | Leads L`
+- New system prompt instructs Claude to identify multi-week trends, cross-source correlations, and provide specific actionable recommendations — not just restate single-period numbers
+- Graceful fallback: if fewer than 2 snapshot periods exist, returns a single WATCH highlight — "Not enough historical data yet — insights will appear after 2 weekly snapshots have been collected" — and skips the Claude API call entirely
+- Both call sites updated: `app/api/analytics/pull/route.ts` and `app/api/cron/mis/route.ts` — highlights now generate even if the current pull failed (uses stored history)
+
 ### Added — Historical Trends Dashboard (Part 4)
 - New page `/analytics/trends` — shows 6 charts of historical metrics powered by stored `metric_snapshots` and `youtube_snapshots`
 - Charts: Organic Sessions (GA4 main + ES two-line), Search Console Clicks (GSC main + ES two-line), YouTube Views per period (bar), YouTube Subscriber Count running total (line), Email Open Rate (line with % axis), New Leads stacked by form source (stacked bar with dynamic per-form colours)
