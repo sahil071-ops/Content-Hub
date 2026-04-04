@@ -6,7 +6,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [v0.5.0] — 2026-04-04
+
+### Added — Migration SQL + backfill script (Part 6)
+- `supabase/migrations/015_metric_snapshots.sql` confirmed: creates `metric_snapshots` (with composite index on `snapshot_type, source, period_start`) and `youtube_snapshots` tables; both have RLS enabled with service-role full-access policies
+- `scripts/backfill-snapshots.ts` — one-time idempotent backfill script that reads all legacy `mis_snapshots` rows and converts them into the new `metric_snapshots` schema; run with `npx tsx scripts/backfill-snapshots.ts`
+  - Maps `source+property` pairs to new normalised source keys (e.g. `ga4/main → ga4_main`, `search_console/es → gsc_es`)
+  - Normalises each source's JSONB `data` field to `NormalizedMetrics` shape
+  - Skips rows already present in `metric_snapshots` (idempotent)
+  - Exits cleanly if `mis_snapshots` table does not exist or is empty
+  - Logs migrated / skipped / failed counts; exits with code 1 if any row failed
 
 ### Added — AI Insights using snapshot history (Part 5)
 - `generateMisHighlights()` rewritten to query `metric_snapshots` directly instead of accepting raw pull results
