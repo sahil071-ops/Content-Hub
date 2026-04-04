@@ -77,6 +77,12 @@ const ANALYTICS_NAV_ITEMS: NavItem[] = [
     icon: History,
     roles: ['admin', 'marketing'],
   },
+  {
+    label: 'Trends',
+    href: '/analytics/trends',
+    icon: BarChart2,
+    roles: ['admin', 'marketing'],
+  },
 ];
 
 const LINKEDIN_NAV_ITEMS: NavItem[] = [

@@ -8,6 +8,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — Historical Trends Dashboard (Part 4)
+- New page `/analytics/trends` — shows 6 charts of historical metrics powered by stored `metric_snapshots` and `youtube_snapshots`
+- Charts: Organic Sessions (GA4 main + ES two-line), Search Console Clicks (GSC main + ES two-line), YouTube Views per period (bar), YouTube Subscriber Count running total (line), Email Open Rate (line with % axis), New Leads stacked by form source (stacked bar with dynamic per-form colours)
+- Sticky filter controls: Source filter (all/GA4/GSC/YouTube/Brevo/Leads), Period toggle (weekly/monthly snapshots), Date range (8 weeks / 6 months / 12 months / all time)
+- Min-3-datapoints guard: charts with fewer than 3 data points show a "Not enough data yet — check back after [next pull date]" placeholder instead of a misleading sparse chart
+- "Trends" navigation link added to the Analytics section of the main sidebar (visible to admin and marketing roles)
+
 ### Added — Brevo API diagnostic
 - `GET /api/analytics/test-brevo` now returns full diagnostic payload: first 8 chars of key, exact URL called, exact headers sent (key truncated), full HTTP status code, and full response body from Brevo
 - "Test Brevo Connection" button added to the Pull History page (`/analytics/mis/history`) via a new `BrevoTestPanel` client component — click to call the diagnostic endpoint and view raw JSON output with a green/red status indicator
