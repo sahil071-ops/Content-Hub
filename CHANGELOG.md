@@ -6,6 +6,55 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [v0.5.0] — 2026-04-04
+
+### Added — Migration SQL + backfill script (Part 6)
+- `supabase/migrations/015_metric_snapshots.sql` confirmed: creates `metric_snapshots` (with composite index on `snapshot_type, source, period_start`) and `youtube_snapshots` tables; both have RLS enabled with service-role full-access policies
+- `scripts/backfill-snapshots.ts` — one-time idempotent backfill script that reads all legacy `mis_snapshots` rows and converts them into the new `metric_snapshots` schema; run with `npx tsx scripts/backfill-snapshots.ts`
+  - Maps `source+property` pairs to new normalised source keys (e.g. `ga4/main → ga4_main`, `search_console/es → gsc_es`)
+  - Normalises each source's JSONB `data` field to `NormalizedMetrics` shape
+  - Skips rows already present in `metric_snapshots` (idempotent)
+  - Exits cleanly if `mis_snapshots` table does not exist or is empty
+  - Logs migrated / skipped / failed counts; exits with code 1 if any row failed
+
+### Added — AI Insights using snapshot history (Part 5)
+- `generateMisHighlights()` rewritten to query `metric_snapshots` directly instead of accepting raw pull results
+- New signature: `generateMisHighlights(serviceClient, periodType)` — fetches the last 8 weekly (or monthly) periods from `metric_snapshots`, groups by `period_start`, and builds a multi-period text summary for Claude
+- Summary format: one line per period — `Week of [date]: GA4 sessions X (main: A, ES: B) | GSC clicks Y / impressions Z / CTR P% | YouTube V views, S subscribers | Brevo open rate R% | Leads L`
+- New system prompt instructs Claude to identify multi-week trends, cross-source correlations, and provide specific actionable recommendations — not just restate single-period numbers
+- Graceful fallback: if fewer than 2 snapshot periods exist, returns a single WATCH highlight — "Not enough historical data yet — insights will appear after 2 weekly snapshots have been collected" — and skips the Claude API call entirely
+- Both call sites updated: `app/api/analytics/pull/route.ts` and `app/api/cron/mis/route.ts` — highlights now generate even if the current pull failed (uses stored history)
+
+### Added — Historical Trends Dashboard (Part 4)
+- New page `/analytics/trends` — shows 6 charts of historical metrics powered by stored `metric_snapshots` and `youtube_snapshots`
+- Charts: Organic Sessions (GA4 main + ES two-line), Search Console Clicks (GSC main + ES two-line), YouTube Views per period (bar), YouTube Subscriber Count running total (line), Email Open Rate (line with % axis), New Leads stacked by form source (stacked bar with dynamic per-form colours)
+- Sticky filter controls: Source filter (all/GA4/GSC/YouTube/Brevo/Leads), Period toggle (weekly/monthly snapshots), Date range (8 weeks / 6 months / 12 months / all time)
+- Min-3-datapoints guard: charts with fewer than 3 data points show a "Not enough data yet — check back after [next pull date]" placeholder instead of a misleading sparse chart
+- "Trends" navigation link added to the Analytics section of the main sidebar (visible to admin and marketing roles)
+
+### Added — Brevo API diagnostic
+- `GET /api/analytics/test-brevo` now returns full diagnostic payload: first 8 chars of key, exact URL called, exact headers sent (key truncated), full HTTP status code, and full response body from Brevo
+- "Test Brevo Connection" button added to the Pull History page (`/analytics/mis/history`) via a new `BrevoTestPanel` client component — click to call the diagnostic endpoint and view raw JSON output with a green/red status indicator
+
+### Added — YouTube subscriber growth from snapshots (Part 3)
+- `/analytics/mis` page now queries `youtube_snapshots` and passes the history to the YouTube section
+- Subscriber scorecard updated: shows current total in large bold, with net change below in green/red (e.g. "+25 this week", "-3 this month") based on the active period toggle
+- Growth is computed by finding the `youtube_snapshots` row with `pulled_at` closest to the start of the selected period (7 / 30 / 90 / 365 days ago) and subtracting from the latest count
+- When fewer than 2 snapshots exist: shows "Tracking started — subscriber growth available after next Monday pull" instead of a number or 0
+- Existing watch time OAuth note kept unchanged
+
+### Added — Snapshot-based historical tracking (Part 2)
+- New Supabase tables: `metric_snapshots` (normalised metrics per source per pull) and `youtube_snapshots` (point-in-time subscriber count) — migration `015_metric_snapshots.sql`
+- New cron endpoints: `GET /api/cron/snapshot-weekly` (Mondays 02:30 UTC) and `GET /api/cron/snapshot-monthly` (1st of month 03:30 UTC) — pull all APIs, store normalised metrics to `metric_snapshots`, store subscriber count to `youtube_snapshots`, log to `mis_pull_logs`
+- `POST /api/analytics/pull` (manual "Pull now" button) now also writes to `metric_snapshots` and `youtube_snapshots` — every manual pull creates a baseline
+- `lib/analytics/snapshot-store.ts` — shared helper: normalises raw pull results per source into `NormalizedMetrics`, computes YouTube subscriber change vs previous `youtube_snapshots` row, stores leads counts from Supabase into `metric_snapshots`
+- Dashboard comparison logic overhauled: `/dashboard` now fetches `metric_snapshots` and builds `SnapshotPairs` — current period snapshot vs previous snapshot (weekly: previous week; monthly: same month last year for YoY)
+- `Delta` component updated with `baselineSet` prop — when only one snapshot exists shows "Baseline set" instead of a meaningless percentage
+- All hero metrics and detail section deltas (GA4 sessions, GSC clicks/impressions, YouTube views, Brevo open rate, Leads count) now use snapshot comparison; `yt.views_prev` (which was lifetime total views, not prev-period) is no longer used as a fallback
+- `NormalizedMetrics`, `MetricSnapshotRow`, `YoutubeSnapshotRow`, `MetricSnapshotSource` types added to `types/database.ts`
+
+---
+
 ## [v0.4.0] — 2026-04-03
 
 ### Fixed — LinkedIn post dates

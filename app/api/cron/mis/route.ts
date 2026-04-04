@@ -140,14 +140,9 @@ export async function GET(request: NextRequest) {
   );
 
   // Generate AI highlights
-  if (results.length > 0 && process.env.ANTHROPIC_API_KEY) {
+  if (process.env.ANTHROPIC_API_KEY) {
     try {
-      const highlights = await generateMisHighlights(
-        results as Parameters<typeof generateMisHighlights>[0],
-        period,
-        startDate,
-        endDate
-      );
+      const highlights = await generateMisHighlights(serviceSupabase, period);
       await serviceSupabase.from('mis_highlights').insert({
         period_start: startDate,
         period_end: endDate,

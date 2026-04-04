@@ -13,10 +13,11 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 
 ## Current Version & Changelog Summary
 
-**Current version: 0.4.0** (package.json)
+**Current version: 0.5.0** (package.json)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v0.5.0 | 2026-04-04 | Snapshot-based historical tracking, Trends dashboard, AI highlights from 8-week history, YouTube subscriber growth, Brevo diagnostic |
 | v0.4.0 | 2026-04-03 | Dashboard redesign, 6 bug fixes, email verification, cron jobs, language tags |
 | v0.3.0 | 2026-03-25 | MIS dashboard redesign, favicon, content previews, CRM lead detail improvements |
 | v0.2.0 | — | LinkedIn tracker, Zoho CRM integration, AI lead enrichment |
@@ -39,6 +40,7 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 /analytics/content            → Content view analytics and targets
 /analytics/mis                → MIS dashboard: GA4, GSC, YouTube, Brevo
 /analytics/mis/history        → Historical MIS pull log viewer
+/analytics/trends             → Historical Trends dashboard (6 charts from metric_snapshots)
 /linkedin                     → LinkedIn post library (sortable table)
 /linkedin/add                 → Add / bulk-add LinkedIn posts
 /linkedin/dashboard           → LinkedIn performance summary
@@ -95,6 +97,8 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 /api/leads/feedback           → GET: all feedback records
 /api/leads/learnings          → GET: derived rules + feedback summary
 /api/cron/mis                 → GET: pull analytics (period= param)
+/api/cron/snapshot-weekly     → GET: weekly snapshot pull (Mondays 02:30 UTC), CRON_SECRET auth
+/api/cron/snapshot-monthly    → GET: monthly snapshot pull (1st 03:30 UTC), CRON_SECRET auth
 /api/leads/wpforms            → POST: WPForms webhook, processes lead synchronously
 /api/cron/process-leads       → GET: manual ad-hoc re-evaluation (not in cron schedule)
 /api/cron/pull-zoho-leads     → GET: daily Zoho pull (2:00 AM UTC)
@@ -112,9 +116,11 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 | `content_items` | Core content repository | id, title, content_type, file_url, file_urls, product_tags, topic_tags, language_tags, audience_tags, medium_tags, status, thumbnail_url, meta (JSONB) |
 | `content_views` | View event log (Phase 3 placeholder) | content_id, viewer_role, viewed_at, session_id |
 | `backup_logs` | R2→B2 backup attempts | content_id, r2_url, b2_url, status, error_message |
-| `mis_snapshots` | Analytics data by source/period | source, property, period_type, period_start, period_end, data (JSONB) |
+| `mis_snapshots` | Analytics data by source/period (legacy) | source, property, period_type, period_start, period_end, data (JSONB) |
 | `mis_pull_logs` | Log of each analytics pull | status, error_message, pulled_at |
 | `mis_highlights` | AI-generated marketing highlights | period_start/end, highlights (JSONB array), feedback (JSONB) |
+| `metric_snapshots` | Normalised metrics per source per pull (migration 015) | snapshot_type, period_start, period_end, source, metrics (JSONB); index on (snapshot_type, source, period_start) |
+| `youtube_snapshots` | Point-in-time subscriber count at each pull (migration 015) | subscriber_count, total_view_count, pulled_at |
 | `content_targets` | Target % by tag for content mix | tag_name, tag_type, target_percentage |
 | `dashboard_configs` | User dashboard layout preferences | user_id, dashboard_name, config (JSONB) |
 | `linkedin_accounts` | LinkedIn accounts tracked | name, account_type, profile_url, is_active |
@@ -184,13 +190,12 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 
 1. **Brevo connectivity** — API key and headers are correct; root cause of intermittent failures not yet identified. Enhanced error logging (status + body) added in v0.4.0 to aid diagnosis. Check Vercel function logs after next pull attempt.
 2. **YouTube per-period watch time** — YouTube Data API v3 with an API key cannot return per-period watch time; requires OAuth (YouTube Analytics API). Zero-value cards now hidden. Fix: add OAuth flow for YouTube.
-3. **Zoho `submitted_at` backfill** — Leads pulled before v0.4.0 have `submitted_at` backfilled from `zoho_created_at → zoho_modified_at → pulled_at`. Leads missing all three will have null `submitted_at` and appear last in the list.
-4. **Abstract API rate limit** — Free tier is 100 verifications/day. High-volume Zoho pulls may exhaust this. Paid plan needed for production scale.
-5. **Google private key encoding on Vercel** — PEM key requires special handling (see `lib/analytics/google-auth.ts`). If GA4/GSC stops working after a re-deploy, check that the env var hasn't been re-escaped.
-6. **PostgreSQL enum add-value transaction constraint** — `ALTER TYPE ... ADD VALUE` cannot be used in the same transaction as statements referencing the new value. Always split into two separate migration files run sequentially (see migrations 011/012).
-7. **`content_type` column is now free text** (was enum, changed in migration 004). Some older code may still cast it as `ContentTypeEnum` — use `string` type in new code.
-8. **Dashboard `/dashboard` is new** — old deep link `/analytics/mis` still works and is still in the sidebar under Analytics for power users.
-9. **No `.env.example` file** — environment variable documentation lives only in this file. Consider creating one.
+3. **Abstract API rate limit** — Free tier is 100 verifications/day. High-volume Zoho pulls may exhaust this. Paid plan needed for production scale.
+4. **Google private key encoding on Vercel** — PEM key requires special handling (see `lib/analytics/google-auth.ts`). If GA4/GSC stops working after a re-deploy, check that the env var hasn't been re-escaped.
+5. **PostgreSQL enum add-value transaction constraint** — `ALTER TYPE ... ADD VALUE` cannot be used in the same transaction as statements referencing the new value. Always split into two separate migration files run sequentially (see migrations 011/012).
+6. **`content_type` column is now free text** (was enum, changed in migration 004). Some older code may still cast it as `ContentTypeEnum` — use `string` type in new code.
+7. **AI insights need 2+ snapshot periods** — `generateMisHighlights()` returns a "not enough data" placeholder until at least 2 weekly (or monthly) pulls have been stored in `metric_snapshots`. Insights improve with more history — full 8-week context available after 8 weekly pulls.
+8. **No `.env.example` file** — environment variable documentation lives only in this file. Consider creating one.
 
 ---
 
@@ -217,7 +222,8 @@ lib/analytics/search-console.ts            → GSC data fetch (clicks, impressio
 lib/analytics/youtube.ts                   → YouTube channel stats and top videos
 lib/analytics/brevo.ts                     → Brevo email campaign stats fetch
 lib/analytics/google-auth.ts              → GCP service account JWT (handles Vercel encoding)
-lib/analytics/ai-highlights.ts             → Claude-generated MIS highlights
+lib/analytics/ai-highlights.ts             → Claude-generated MIS highlights (uses 8-week metric_snapshots history)
+lib/analytics/snapshot-store.ts            → Normalises pull results into metric_snapshots + youtube_snapshots
 lib/crm/zoho-client.ts                     → Zoho OAuth client, token refresh, lead fetch
 lib/crm/enricher.ts                        → Claude lead enrichment (company/product analysis)
 lib/crm/spam-detector.ts                   → Heuristic + Claude spam scoring + deriveLearnedRules()
@@ -227,7 +233,8 @@ components/layout/app-shell.tsx            → Authenticated layout wrapper
 components/analytics/mis/mis-dashboard-client.tsx → MIS dashboard state and layout
 components/analytics/ai-highlights-panel.tsx → Highlight cards with thumbs feedback
 types/database.ts                          → All TypeScript types for DB rows and enums
-supabase/migrations/                       → All 14 SQL migrations, run in order
+supabase/migrations/                       → All 15 SQL migrations, run in order
+scripts/backfill-snapshots.ts              → One-time backfill from mis_snapshots → metric_snapshots (run with npx tsx)
 vercel.json                                → Cron job schedules (5 jobs, all once/day or less)
 ```
 
@@ -259,5 +266,6 @@ vercel.json                                → Cron job schedules (5 jobs, all o
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-04-04 | v0.5.0 | Parts 1-6: Brevo diagnostic endpoint + UI button; metric_snapshots + youtube_snapshots tables (migration 015); snapshot-weekly + snapshot-monthly cron endpoints; manual pull writes to metric_snapshots; dashboard comparison uses snapshot deltas; YouTube subscriber growth from snapshots; /analytics/trends page (6 charts); AI highlights rewritten to use 8-week snapshot history; backfill script for legacy mis_snapshots |
 | 2026-04-03 | v0.4.0 | Fixed 6 bugs (LinkedIn dates/payload/AI rules/Zoho dates/YouTube zeros/Brevo errors); added email verification via Abstract API; added language tags; added Vercel cron jobs; rebuilt /dashboard with AI highlights + number strip + detail cards; added PROJECT_DOCS.md |
 | 2026-04-03 | v0.4.0 | Fixed Vercel Hobby plan cron limit: removed process-leads (*/15) and pull-zoho-leads (*/4h) from schedule; added /api/leads/wpforms webhook for synchronous WPForms lead processing; Zoho pull moved to once daily (0 2 * * *); 5 crons remain, all ≤ once/day |

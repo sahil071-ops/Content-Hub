@@ -3,10 +3,17 @@
 import { ExternalLink } from 'lucide-react';
 import { RechartsLine } from '@/components/analytics/recharts-line';
 import { cn } from '@/lib/utils';
-import type { YoutubeSnapshotData } from '@/types/database';
+import type { YoutubeSnapshotData, MisPeriodTypeEnum } from '@/types/database';
+
+interface YoutubeSnapshotPoint {
+  subscriber_count: number;
+  pulled_at: string;
+}
 
 interface YouTubeSectionProps {
   data: YoutubeSnapshotData;
+  periodType?: MisPeriodTypeEnum;
+  youtubeSnapshots?: YoutubeSnapshotPoint[];
 }
 
 function fmt(n: number): string {
@@ -15,10 +22,61 @@ function fmt(n: number): string {
   return n.toLocaleString();
 }
 
-export function YouTubeSection({ data }: YouTubeSectionProps) {
+const PERIOD_DAYS: Record<MisPeriodTypeEnum, number> = {
+  weekly:    7,
+  monthly:   30,
+  quarterly: 90,
+  annual:    365,
+};
+
+const PERIOD_LABELS: Record<MisPeriodTypeEnum, string> = {
+  weekly:    'this week',
+  monthly:   'this month',
+  quarterly: 'this quarter',
+  annual:    'this year',
+};
+
+/**
+ * Compute subscriber change over the selected period using youtube_snapshots.
+ * Returns null when there aren't enough snapshots to compare.
+ */
+function getSubscriberGrowth(
+  snapshots: YoutubeSnapshotPoint[],
+  periodType: MisPeriodTypeEnum,
+): { change: number; periodLabel: string } | null {
+  if (snapshots.length < 2) return null;
+
+  const days = PERIOD_DAYS[periodType];
+  const targetMs = Date.now() - days * 24 * 60 * 60 * 1000;
+
+  const current = snapshots[0]; // most recent (ordered desc by pulled_at)
+
+  // Find the snapshot whose pulled_at is closest to `targetMs`
+  const baseline = snapshots.reduce((closest, snap) => {
+    const snapDiff  = Math.abs(new Date(snap.pulled_at).getTime()    - targetMs);
+    const closestDiff = Math.abs(new Date(closest.pulled_at).getTime() - targetMs);
+    return snapDiff < closestDiff ? snap : closest;
+  });
+
+  // If the best-fit baseline IS the current snapshot, we can't compute a delta
+  if (baseline.pulled_at === current.pulled_at) return null;
+
+  return {
+    change: current.subscriber_count - baseline.subscriber_count,
+    periodLabel: PERIOD_LABELS[periodType],
+  };
+}
+
+export function YouTubeSection({ data, periodType = 'monthly', youtubeSnapshots }: YouTubeSectionProps) {
   const topVideo = data.top_videos[0];
   const videoCount = data.top_videos.length || 1;
   const avgViews = Math.round(data.views / videoCount);
+
+  // Subscriber growth from youtube_snapshots
+  const growth = youtubeSnapshots && youtubeSnapshots.length >= 2
+    ? getSubscriberGrowth(youtubeSnapshots, periodType)
+    : null;
+  const notEnoughSnapshots = !youtubeSnapshots || youtubeSnapshots.length < 2;
 
   // Auto-summary
   const summary = topVideo
@@ -37,23 +95,41 @@ export function YouTubeSection({ data }: YouTubeSectionProps) {
           <p className="text-2xl font-bold">{fmt(data.views)}</p>
           <p className="text-xs text-muted-foreground mt-1">Recent {data.top_videos.length} videos</p>
         </div>
+
         <div className="rounded-lg border bg-card p-4">
           <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Avg Views / Video</p>
           <p className="text-2xl font-bold">{fmt(avgViews)}</p>
         </div>
-        {data.watch_time_minutes > 0 ? (
-          <div className="rounded-lg border bg-card p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Watch Time</p>
-            <p className="text-2xl font-bold">{Math.round(data.watch_time_minutes / 60)}h</p>
-          </div>
-        ) : (
-          <div className="rounded-lg border bg-card/50 p-4 flex items-center">
-            <p className="text-xs text-muted-foreground">
-              Subscriber &amp; watch time data requires YouTube account connection — set up in Admin Settings.
+
+        {/* Subscriber scorecard */}
+        <div className="rounded-lg border bg-card p-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Subscribers</p>
+          <p className="text-2xl font-bold">{fmt(data.net_subscribers)}</p>
+          {notEnoughSnapshots ? (
+            <p className="text-xs text-muted-foreground mt-1 leading-snug">
+              Tracking started — growth available after next Monday pull
             </p>
-          </div>
-        )}
+          ) : growth !== null ? (
+            <p className={cn(
+              'text-xs font-semibold mt-1',
+              growth.change > 0 ? 'text-emerald-600 dark:text-emerald-400' :
+              growth.change < 0 ? 'text-red-600 dark:text-red-400' :
+              'text-muted-foreground',
+            )}>
+              {growth.change > 0 ? '+' : ''}{growth.change.toLocaleString()} {growth.periodLabel}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-1">No change data for period</p>
+          )}
+        </div>
       </div>
+
+      {/* Watch time — requires OAuth note */}
+      {data.watch_time_minutes === 0 && (
+        <p className="text-xs text-muted-foreground bg-muted/50 rounded px-3 py-2">
+          Watch time data requires YouTube account connection — set up in Admin Settings.
+        </p>
+      )}
 
       {/* Top 5 videos — visual bar-list */}
       {data.top_videos.length > 0 && (
