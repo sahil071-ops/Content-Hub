@@ -411,6 +411,74 @@ export interface BrevoSnapshotData {
   avg_ctor: number;
 }
 
+// ── Metric Snapshots (Phase 2b) — snapshot-based historical comparison ─────
+
+/**
+ * Normalised metrics stored in metric_snapshots.metrics (JSONB).
+ * Fields are source-specific — not all fields are present for every source.
+ */
+export interface NormalizedMetrics {
+  // GA4 (ga4_main / ga4_es)
+  organic_sessions?: number;
+  new_users?: number;
+  returning_users?: number;
+  bounce_rate?: number;
+  india_sessions?: number;
+  india_pct?: number;
+  top_countries?: { country: string; sessions: number }[];
+
+  // GSC (gsc_main / gsc_es)
+  clicks?: number;
+  impressions?: number;
+  ctr?: number;
+  avg_position?: number;
+  india_clicks?: number;
+  india_impressions?: number;
+  top_queries?: { query: string; clicks: number; impressions: number; ctr: number; position: number }[];
+  top_pages?: { page: string; clicks: number; impressions: number }[];
+
+  // YouTube
+  views?: number;
+  subscriber_count?: number;
+  subscriber_change?: number;
+  top_videos?: { title: string; views: number; video_id: string }[];
+
+  // Brevo
+  campaigns_sent?: number;
+  avg_open_rate?: number;
+  avg_click_rate?: number;
+  avg_ctor?: number;
+  campaigns?: { name: string; open_rate: number; click_rate: number; ctor: number; unsubscribe_rate: number }[];
+
+  // Leads
+  total_leads?: number;
+  spam_count?: number;
+  high_value_count?: number;
+  clean_count?: number;
+  india_count?: number;
+  by_form?: Record<string, number>;
+}
+
+export type MetricSnapshotSource = 'ga4_main' | 'ga4_es' | 'gsc_main' | 'gsc_es' | 'youtube' | 'brevo' | 'leads';
+
+export interface MetricSnapshotRow {
+  id: string;
+  snapshot_type: string;
+  period_start: string;
+  period_end: string;
+  source: MetricSnapshotSource;
+  metrics: NormalizedMetrics;
+  pulled_at: string;
+  created_at: string;
+}
+
+export interface YoutubeSnapshotRow {
+  id: string;
+  subscriber_count: number;
+  total_view_count: number | null;
+  pulled_at: string;
+}
+
 // ── CRM / Leads (Phase 4) ───────────────────────────────────────
 
 export type LeadEnrichmentStatus = 'none' | 'pending' | 'done' | 'failed';

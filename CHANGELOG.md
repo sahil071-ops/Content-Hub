@@ -12,6 +12,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `GET /api/analytics/test-brevo` now returns full diagnostic payload: first 8 chars of key, exact URL called, exact headers sent (key truncated), full HTTP status code, and full response body from Brevo
 - "Test Brevo Connection" button added to the Pull History page (`/analytics/mis/history`) via a new `BrevoTestPanel` client component — click to call the diagnostic endpoint and view raw JSON output with a green/red status indicator
 
+### Added — Snapshot-based historical tracking (Part 2)
+- New Supabase tables: `metric_snapshots` (normalised metrics per source per pull) and `youtube_snapshots` (point-in-time subscriber count) — migration `015_metric_snapshots.sql`
+- New cron endpoints: `GET /api/cron/snapshot-weekly` (Mondays 02:30 UTC) and `GET /api/cron/snapshot-monthly` (1st of month 03:30 UTC) — pull all APIs, store normalised metrics to `metric_snapshots`, store subscriber count to `youtube_snapshots`, log to `mis_pull_logs`
+- `POST /api/analytics/pull` (manual "Pull now" button) now also writes to `metric_snapshots` and `youtube_snapshots` — every manual pull creates a baseline
+- `lib/analytics/snapshot-store.ts` — shared helper: normalises raw pull results per source into `NormalizedMetrics`, computes YouTube subscriber change vs previous `youtube_snapshots` row, stores leads counts from Supabase into `metric_snapshots`
+- Dashboard comparison logic overhauled: `/dashboard` now fetches `metric_snapshots` and builds `SnapshotPairs` — current period snapshot vs previous snapshot (weekly: previous week; monthly: same month last year for YoY)
+- `Delta` component updated with `baselineSet` prop — when only one snapshot exists shows "Baseline set" instead of a meaningless percentage
+- All hero metrics and detail section deltas (GA4 sessions, GSC clicks/impressions, YouTube views, Brevo open rate, Leads count) now use snapshot comparison; `yt.views_prev` (which was lifetime total views, not prev-period) is no longer used as a fallback
+- `NormalizedMetrics`, `MetricSnapshotRow`, `YoutubeSnapshotRow`, `MetricSnapshotSource` types added to `types/database.ts`
+
 ---
 
 ## [v0.4.0] — 2026-04-03

@@ -12,7 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { RechartsBar } from '@/components/analytics/recharts-bar';
 import { RechartsLine } from '@/components/analytics/recharts-line';
-import type { MisHighlight, MisPeriodTypeEnum } from '@/types/database';
+import type { MisHighlight, MisPeriodTypeEnum, NormalizedMetrics } from '@/types/database';
+import type { SnapshotPairs } from './page';
 
 type PeriodKey = MisPeriodTypeEnum;
 
@@ -21,6 +22,7 @@ interface DashboardClientProps {
   highlights: MisHighlight[];
   leadCounts: Record<string, { total: number; spam: number; high_value: number }>;
   lastPullAt: string | null;
+  snapshotPairs?: SnapshotPairs;
 }
 
 const PERIODS: { key: PeriodKey; label: string }[] = [
@@ -42,7 +44,17 @@ function pct(n: number | undefined | null): string {
   return `${n.toFixed(1)}%`;
 }
 
-function Delta({ current, prev, invert = false }: { current?: number | null; prev?: number | null; invert?: boolean }) {
+function Delta({
+  current, prev, baselineSet = false, invert = false,
+}: {
+  current?: number | null;
+  prev?: number | null;
+  baselineSet?: boolean;
+  invert?: boolean;
+}) {
+  if (baselineSet) {
+    return <span className="text-xs text-muted-foreground italic">Baseline set</span>;
+  }
   if (current == null || prev == null || prev === 0) return null;
   const change = ((current - prev) / prev) * 100;
   const positive = invert ? change < 0 : change > 0;
@@ -149,7 +161,7 @@ function HighlightCard({ item, onFeedback }: {
 }
 
 // ── Main component ───────────────────────────────────────────────
-export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }: DashboardClientProps) {
+export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, snapshotPairs }: DashboardClientProps) {
   const [period, setPeriod] = useState<PeriodKey>('weekly');
   const [pulling, setPulling] = useState(false);
 
@@ -161,6 +173,41 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
   const yt     = data['youtube']             as any;
   const brevo  = data['brevo']               as any;
   const leads  = leadCounts[period]          || { total: 0, spam: 0, high_value: 0 };
+
+  // ── Snapshot-based comparison helpers ───────────────────────
+  /** Get current/prev metrics from metric_snapshots for a given source. */
+  function snap(source: string) {
+    return snapshotPairs?.[period]?.[source] ?? null;
+  }
+
+  /**
+   * Returns a <Delta> element using snapshot comparison when available.
+   * Falls back to embedded _prev fields from raw API data.
+   * Shows "Baseline set" when first snapshot exists but second doesn't yet.
+   */
+  function snapDelta(
+    source: string,
+    metricKey: keyof NormalizedMetrics,
+    fallbackCurrent?: number | null,
+    fallbackPrev?: number | null,
+    invert = false,
+  ): React.ReactNode {
+    const pair = snap(source);
+    if (pair) {
+      const cur = pair.current?.[metricKey] as number | undefined;
+      const pre = pair.prev?.[metricKey] as number | undefined;
+      return (
+        <Delta
+          current={cur ?? null}
+          prev={pre ?? null}
+          baselineSet={pair.hasBaseline}
+          invert={invert}
+        />
+      );
+    }
+    // No snapshot data yet — fall back to embedded _prev field
+    return <Delta current={fallbackCurrent} prev={fallbackPrev} invert={invert} />;
+  }
 
   // Latest highlight for selected period
   const highlight = highlights.find(h => h.period_type === period) || highlights[0] || null;
@@ -194,27 +241,28 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
     {
       icon: Globe, color: 'text-blue-500', bg: 'bg-blue-500/10',
       label: 'Organic Sessions', value: fmt(ga4?.organic_sessions),
-      delta: <Delta current={ga4?.organic_sessions} prev={ga4?.organic_sessions_prev} />,
+      delta: snapDelta('ga4_main', 'organic_sessions', ga4?.organic_sessions, ga4?.organic_sessions_prev),
     },
     {
       icon: BarChart3, color: 'text-emerald-500', bg: 'bg-emerald-500/10',
       label: 'Search Clicks', value: fmt(gsc?.clicks),
-      delta: <Delta current={gsc?.clicks} prev={gsc?.clicks_prev} />,
+      delta: snapDelta('gsc_main', 'clicks', gsc?.clicks, gsc?.clicks_prev),
     },
     {
       icon: Youtube, color: 'text-red-500', bg: 'bg-red-500/10',
       label: 'YouTube Views', value: fmt(yt?.views),
-      delta: <Delta current={yt?.views} prev={yt?.views_prev} />,
+      // yt.views_prev is lifetime total channel views (not prev period) — never use as fallback
+      delta: snapDelta('youtube', 'views'),
     },
     {
       icon: Mail, color: 'text-teal-500', bg: 'bg-teal-500/10',
       label: 'Email Open Rate', value: brevo ? pct(brevo.avg_open_rate) : '—',
-      delta: null,
+      delta: snapDelta('brevo', 'avg_open_rate'),
     },
     {
       icon: Users, color: 'text-purple-500', bg: 'bg-purple-500/10',
       label: 'New Leads', value: fmt(leads.total),
-      delta: null,
+      delta: snapDelta('leads', 'total_leads'),
     },
   ];
 
@@ -331,7 +379,7 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
           iconColor="text-red-500"
           heroValue={fmt(yt?.views)}
           heroLabel="views"
-          delta={<Delta current={yt?.views} prev={yt?.views_prev} />}
+          delta={snapDelta('youtube', 'views')}
           oneLine={ytSummary}
         >
           {yt ? (
@@ -379,7 +427,7 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
           iconColor="text-blue-500"
           heroValue={fmt(ga4?.organic_sessions)}
           heroLabel="organic sessions"
-          delta={<Delta current={ga4?.organic_sessions} prev={ga4?.organic_sessions_prev} />}
+          delta={snapDelta('ga4_main', 'organic_sessions', ga4?.organic_sessions, ga4?.organic_sessions_prev)}
           oneLine={`${ga4Summary} ${gscSummary}`}
         >
           {(ga4 || gsc) ? (
@@ -389,8 +437,8 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">GA4 — Traffic</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {[
-                      { label: 'Organic Sessions', val: fmt(ga4.organic_sessions), sub: <Delta current={ga4.organic_sessions} prev={ga4.organic_sessions_prev} /> },
-                      { label: 'New Users', val: fmt(ga4.new_users), sub: null },
+                      { label: 'Organic Sessions', val: fmt(ga4.organic_sessions), sub: snapDelta('ga4_main', 'organic_sessions', ga4.organic_sessions, ga4.organic_sessions_prev) },
+                      { label: 'New Users', val: fmt(ga4.new_users), sub: snapDelta('ga4_main', 'new_users') },
                       { label: 'Bounce Rate', val: pct(ga4.bounce_rate), sub: null },
                     ].map(m => (
                       <div key={m.label} className="rounded-md border bg-muted/20 p-3">
@@ -418,8 +466,8 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Search Console</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
-                      { label: 'Clicks', val: fmt(gsc.clicks), delta: <Delta current={gsc.clicks} prev={gsc.clicks_prev} /> },
-                      { label: 'Impressions', val: fmt(gsc.impressions), delta: <Delta current={gsc.impressions} prev={gsc.impressions_prev} /> },
+                      { label: 'Clicks', val: fmt(gsc.clicks), delta: snapDelta('gsc_main', 'clicks', gsc.clicks, gsc.clicks_prev) },
+                      { label: 'Impressions', val: fmt(gsc.impressions), delta: snapDelta('gsc_main', 'impressions', gsc.impressions, gsc.impressions_prev) },
                       { label: 'CTR', val: pct(gsc.ctr), delta: null },
                       { label: 'Avg Position', val: gsc.position?.toFixed(1) ?? '—', delta: null },
                     ].map(m => (
@@ -477,7 +525,7 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
           iconColor="text-orange-500"
           heroValue={fmt(ga4Es?.organic_sessions)}
           heroLabel="organic sessions"
-          delta={<Delta current={ga4Es?.organic_sessions} prev={ga4Es?.organic_sessions_prev} />}
+          delta={snapDelta('ga4_es', 'organic_sessions', ga4Es?.organic_sessions, ga4Es?.organic_sessions_prev)}
           oneLine={ga4Es
             ? `${fmt(ga4Es.organic_sessions)} sessions. ${gscEs ? `${fmt(gscEs.clicks)} GSC clicks.` : ''}`
             : 'No data for this period.'}
@@ -489,8 +537,8 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">GA4 — ES Traffic</p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {[
-                      { label: 'Organic Sessions', val: fmt(ga4Es.organic_sessions), delta: <Delta current={ga4Es.organic_sessions} prev={ga4Es.organic_sessions_prev} /> },
-                      { label: 'New Users', val: fmt(ga4Es.new_users), delta: null },
+                      { label: 'Organic Sessions', val: fmt(ga4Es.organic_sessions), delta: snapDelta('ga4_es', 'organic_sessions', ga4Es.organic_sessions, ga4Es.organic_sessions_prev) },
+                      { label: 'New Users', val: fmt(ga4Es.new_users), delta: snapDelta('ga4_es', 'new_users') },
                       { label: 'Bounce Rate', val: pct(ga4Es.bounce_rate), delta: null },
                     ].map(m => (
                       <div key={m.label} className="rounded-md border bg-muted/20 p-3">
@@ -507,8 +555,8 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt }
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Search Console — ES</p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {[
-                      { label: 'Clicks', val: fmt(gscEs.clicks), delta: <Delta current={gscEs.clicks} prev={gscEs.clicks_prev} /> },
-                      { label: 'Impressions', val: fmt(gscEs.impressions), delta: null },
+                      { label: 'Clicks', val: fmt(gscEs.clicks), delta: snapDelta('gsc_es', 'clicks', gscEs.clicks, gscEs.clicks_prev) },
+                      { label: 'Impressions', val: fmt(gscEs.impressions), delta: snapDelta('gsc_es', 'impressions') },
                       { label: 'CTR', val: pct(gscEs.ctr), delta: null },
                       { label: 'Avg Position', val: gscEs.position?.toFixed(1) ?? '—', delta: null },
                     ].map(m => (
