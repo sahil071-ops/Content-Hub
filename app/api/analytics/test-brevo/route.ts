@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 /**
  * GET /api/analytics/test-brevo
  * Validates the BREVO_API_KEY by calling the /account endpoint.
- * Returns the account name/email on success, or the full error on failure.
+ * Returns full diagnostic info: key preview, exact URL, headers sent, status, and full response body.
  */
 export async function GET() {
   const supabase = createClient();
@@ -16,10 +16,15 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: 'BREVO_API_KEY env var is not set' });
   }
 
-  const keyPreview = `${apiKey.slice(0, 10)}...${apiKey.slice(-4)}`;
+  const keyPreview = apiKey.slice(0, 8);
+  const url = 'https://api.brevo.com/v3/account';
+  const headers = {
+    'api-key': `${keyPreview}...`,
+    'Accept': 'application/json',
+  };
 
   try {
-    const res = await fetch('https://api.brevo.com/v3/account', {
+    const res = await fetch(url, {
       headers: {
         'api-key': apiKey,
         'Accept': 'application/json',
@@ -28,26 +33,24 @@ export async function GET() {
 
     const body = await res.json() as Record<string, unknown>;
 
-    if (!res.ok) {
-      return NextResponse.json({
-        ok: false,
-        key_preview: keyPreview,
-        status: res.status,
-        error: body.message ?? JSON.stringify(body),
-        hint: res.status === 401
-          ? 'The key is invalid. Make sure you are using an API v3 key from Brevo Settings → SMTP & API → API Keys tab (starts with xkeysib-). The MCP key and SMTP password will not work here.'
-          : undefined,
-      });
-    }
-
     return NextResponse.json({
-      ok: true,
+      ok: res.ok,
       key_preview: keyPreview,
-      account_email: body.email,
-      account_name: `${body.firstName ?? ''} ${body.lastName ?? ''}`.trim() || body.companyName,
-      plan: (body.plan as any[])?.[0]?.type,
+      url,
+      headers_sent: headers,
+      status: res.status,
+      body,
+      ...(res.status === 401 ? {
+        hint: 'The key is invalid. Make sure you are using an API v3 key from Brevo Settings → SMTP & API → API Keys tab (starts with xkeysib-). The MCP key and SMTP password will not work here.',
+      } : {}),
     });
   } catch (e) {
-    return NextResponse.json({ ok: false, key_preview: keyPreview, error: String(e) });
+    return NextResponse.json({
+      ok: false,
+      key_preview: keyPreview,
+      url,
+      headers_sent: headers,
+      error: String(e),
+    });
   }
 }

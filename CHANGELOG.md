@@ -6,6 +6,14 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased]
+
+### Added — Brevo API diagnostic
+- `GET /api/analytics/test-brevo` now returns full diagnostic payload: first 8 chars of key, exact URL called, exact headers sent (key truncated), full HTTP status code, and full response body from Brevo
+- "Test Brevo Connection" button added to the Pull History page (`/analytics/mis/history`) via a new `BrevoTestPanel` client component — click to call the diagnostic endpoint and view raw JSON output with a green/red status indicator
+
+---
+
 ## [v0.4.0] — 2026-04-03
 
 ### Fixed — LinkedIn post dates

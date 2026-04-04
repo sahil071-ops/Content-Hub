@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { BrevoTestPanel } from './brevo-test-panel';
 
 export const metadata: Metadata = { title: 'MIS Pull History' };
 export const dynamic = 'force-dynamic';
@@ -48,6 +49,12 @@ export default async function MisHistoryPage() {
           <p className="text-sm text-muted-foreground mt-0.5">All past data pulls and snapshots</p>
         </div>
       </div>
+
+      {/* Brevo Diagnostic */}
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">Brevo API Diagnostic</h2>
+        <BrevoTestPanel />
+      </section>
 
       {/* Snapshots */}
       <section>
