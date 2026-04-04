@@ -28,6 +28,11 @@ interface SnapshotMap {
   brevo?: BrevoSnapshotData;
 }
 
+interface YoutubeSnapshotPoint {
+  subscriber_count: number;
+  pulled_at: string;
+}
+
 interface MisDashboardClientProps {
   snapshots: SnapshotMap;
   latestHighlight: MisHighlight | null;
@@ -40,6 +45,7 @@ interface MisDashboardClientProps {
   hasYoutube: boolean;
   hasBrevo: boolean;
   lastPullTime?: string | null;
+  youtubeSnapshots?: YoutubeSnapshotPoint[];
 }
 
 // Source accent colours for section borders and nav pills
@@ -95,6 +101,7 @@ export function MisDashboardClient({
   hasYoutube,
   hasBrevo,
   lastPullTime,
+  youtubeSnapshots,
 }: MisDashboardClientProps) {
   const [periodType, setPeriodType] = useState<MisPeriodTypeEnum>('monthly');
   const [countryFilter, setCountryFilter] = useState<'all' | 'india'>('all');
@@ -116,7 +123,13 @@ export function MisDashboardClient({
       badge: 'YouTube',
       component: (
         <SectionCard id="section-youtube" title="YouTube Analytics" question="Is our channel growing?" colorKey="youtube">
-          {snapshots.youtube ? <YouTubeSection data={snapshots.youtube} /> : EMPTY_PLACEHOLDER}
+          {snapshots.youtube
+            ? <YouTubeSection
+                data={snapshots.youtube}
+                periodType={periodType}
+                youtubeSnapshots={youtubeSnapshots}
+              />
+            : EMPTY_PLACEHOLDER}
         </SectionCard>
       ),
     }] : []),

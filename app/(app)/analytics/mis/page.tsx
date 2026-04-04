@@ -9,6 +9,7 @@ import type {
   GscSnapshotData,
   YoutubeSnapshotData,
   BrevoSnapshotData,
+  YoutubeSnapshotRow,
 } from '@/types/database';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
@@ -73,6 +74,15 @@ export default async function MisDashboardPage() {
 
   const isAdmin = userRole === 'admin';
 
+  // Fetch youtube_snapshots for subscriber growth calculation
+  const { data: ytSnapshotRows } = await supabase
+    .from('youtube_snapshots')
+    .select('subscriber_count, total_view_count, pulled_at')
+    .order('pulled_at', { ascending: false })
+    .limit(60);
+
+  const youtubeSnapshots = (ytSnapshotRows || []) as Pick<YoutubeSnapshotRow, 'subscriber_count' | 'pulled_at'>[];
+
   // Determine which env vars are configured (without exposing values)
   const hasGA4Main = Boolean(process.env.GA4_PROPERTY_ID_MAIN);
   const hasGA4Es = Boolean(process.env.GA4_PROPERTY_ID_ES);
@@ -112,6 +122,7 @@ export default async function MisDashboardPage() {
         hasYoutube={hasYoutube}
         hasBrevo={hasBrevo}
         lastPullTime={lastPullTime}
+        youtubeSnapshots={youtubeSnapshots}
       />
     </div>
   );

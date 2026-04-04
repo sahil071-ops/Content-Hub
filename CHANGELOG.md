@@ -12,6 +12,13 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `GET /api/analytics/test-brevo` now returns full diagnostic payload: first 8 chars of key, exact URL called, exact headers sent (key truncated), full HTTP status code, and full response body from Brevo
 - "Test Brevo Connection" button added to the Pull History page (`/analytics/mis/history`) via a new `BrevoTestPanel` client component — click to call the diagnostic endpoint and view raw JSON output with a green/red status indicator
 
+### Added — YouTube subscriber growth from snapshots (Part 3)
+- `/analytics/mis` page now queries `youtube_snapshots` and passes the history to the YouTube section
+- Subscriber scorecard updated: shows current total in large bold, with net change below in green/red (e.g. "+25 this week", "-3 this month") based on the active period toggle
+- Growth is computed by finding the `youtube_snapshots` row with `pulled_at` closest to the start of the selected period (7 / 30 / 90 / 365 days ago) and subtracting from the latest count
+- When fewer than 2 snapshots exist: shows "Tracking started — subscriber growth available after next Monday pull" instead of a number or 0
+- Existing watch time OAuth note kept unchanged
+
 ### Added — Snapshot-based historical tracking (Part 2)
 - New Supabase tables: `metric_snapshots` (normalised metrics per source per pull) and `youtube_snapshots` (point-in-time subscriber count) — migration `015_metric_snapshots.sql`
 - New cron endpoints: `GET /api/cron/snapshot-weekly` (Mondays 02:30 UTC) and `GET /api/cron/snapshot-monthly` (1st of month 03:30 UTC) — pull all APIs, store normalised metrics to `metric_snapshots`, store subscriber count to `youtube_snapshots`, log to `mis_pull_logs`
