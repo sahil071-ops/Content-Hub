@@ -213,3 +213,99 @@ export async function storeLeadsSnapshot(
     metrics,
   });
 }
+
+/**
+ * Aggregate published linkedin_posts for the period and store as source='linkedin' snapshot.
+ * Always stores a row (with zeros) even when no posts exist — preserves the timeline.
+ */
+export async function storeLinkedInSnapshot(
+  snapshotType: string,
+  periodStart: string,
+  periodEnd: string,
+  serviceClient: SupabaseClient
+): Promise<void> {
+  interface LiPostRow {
+    post_date: string;
+    post_text: string | null;
+    engagement_rate: number | null;
+    impressions: number | null;
+    reactions: number | null;
+    comments: number | null;
+    shares: number | null;
+    post_url: string | null;
+    account: { name: string } | { name: string }[] | null;
+  }
+
+  const { data: posts } = await serviceClient
+    .from('linkedin_posts')
+    .select('post_date, post_text, engagement_rate, impressions, reactions, comments, shares, post_url, account:linkedin_accounts!account_id(name)')
+    .eq('status', 'published')
+    .gte('post_date', periodStart)
+    .lte('post_date', periodEnd);
+
+  const rows = (posts ?? []) as LiPostRow[];
+
+  /** Resolve account name from Supabase join (returns object or array) */
+  function accountName(row: LiPostRow): string {
+    if (!row.account) return 'Unknown';
+    if (Array.isArray(row.account)) return row.account[0]?.name ?? 'Unknown';
+    return row.account.name;
+  }
+
+  const totalImpressions  = rows.reduce((s, p) => s + (p.impressions ?? 0), 0);
+  const avgEngagementRate = rows.length > 0
+    ? rows.reduce((s, p) => s + (p.engagement_rate ?? 0), 0) / rows.length
+    : 0;
+  const totalReactions = rows.reduce((s, p) => s + (p.reactions ?? 0), 0);
+  const totalComments  = rows.reduce((s, p) => s + (p.comments  ?? 0), 0);
+  const totalShares    = rows.reduce((s, p) => s + (p.shares    ?? 0), 0);
+
+  // Best post = highest engagement_rate
+  const bestRow = rows.length > 0
+    ? rows.reduce((best, p) => (p.engagement_rate ?? 0) > (best.engagement_rate ?? 0) ? p : best, rows[0])
+    : null;
+
+  // Per-account aggregation
+  const byAccountAcc: Record<string, { posts: number; engSum: number; totalImpressions: number }> = {};
+  for (const p of rows) {
+    const name = accountName(p);
+    if (!byAccountAcc[name]) byAccountAcc[name] = { posts: 0, engSum: 0, totalImpressions: 0 };
+    byAccountAcc[name].posts           += 1;
+    byAccountAcc[name].engSum          += (p.engagement_rate ?? 0);
+    byAccountAcc[name].totalImpressions += (p.impressions    ?? 0);
+  }
+  const by_account: NormalizedMetrics['by_account'] = {};
+  for (const [name, acc] of Object.entries(byAccountAcc)) {
+    by_account[name] = {
+      posts: acc.posts,
+      avg_engagement_rate: acc.posts > 0 ? Math.round((acc.engSum / acc.posts) * 100) / 100 : 0,
+      total_impressions: acc.totalImpressions,
+    };
+  }
+
+  const metrics: NormalizedMetrics = {
+    posts_published:     rows.length,
+    total_impressions:   totalImpressions,
+    avg_engagement_rate: Math.round(avgEngagementRate * 100) / 100,
+    total_reactions:     totalReactions,
+    total_comments:      totalComments,
+    total_shares:        totalShares,
+    best_post: bestRow ? {
+      post_date:         bestRow.post_date,
+      account_name:      accountName(bestRow),
+      post_text_preview: (bestRow.post_text ?? '').slice(0, 120),
+      impressions:       bestRow.impressions ?? 0,
+      engagement_rate:   bestRow.engagement_rate ?? 0,
+      post_url:          bestRow.post_url,
+    } : undefined,
+    by_account: Object.keys(by_account).length > 0 ? by_account : undefined,
+  };
+
+  await serviceClient.from('metric_snapshots').insert({
+    snapshot_type: snapshotType,
+    period_start:  periodStart,
+    period_end:    periodEnd,
+    source:        'linkedin' as MetricSnapshotSource,
+    metrics,
+  });
+}

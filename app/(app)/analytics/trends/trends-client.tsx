@@ -22,18 +22,20 @@ const COLORS = {
 };
 
 const LEADS_PALETTE = ['#8B5CF6', '#6D28D9', '#A78BFA', '#C4B5FD', '#7C3AED'];
+const LI_ACCOUNT_PALETTE = ['#0077B5', '#00A0DC', '#0288D1', '#039BE5', '#006097'];
 
-type SourceFilter = 'all' | 'ga4' | 'gsc' | 'youtube' | 'brevo' | 'leads';
+type SourceFilter = 'all' | 'ga4' | 'gsc' | 'youtube' | 'brevo' | 'leads' | 'linkedin';
 type PeriodFilter = 'weekly' | 'monthly';
 type RangeFilter  = '8w' | '6m' | '12m' | 'all';
 
 const SOURCE_OPTIONS: { key: SourceFilter; label: string }[] = [
-  { key: 'all',     label: 'All Sources' },
-  { key: 'ga4',     label: 'GA4' },
-  { key: 'gsc',     label: 'Search Console' },
-  { key: 'youtube', label: 'YouTube' },
-  { key: 'brevo',   label: 'Brevo' },
-  { key: 'leads',   label: 'Leads' },
+  { key: 'all',      label: 'All Sources' },
+  { key: 'ga4',      label: 'GA4' },
+  { key: 'gsc',      label: 'Search Console' },
+  { key: 'youtube',  label: 'YouTube' },
+  { key: 'brevo',    label: 'Brevo' },
+  { key: 'leads',    label: 'Leads' },
+  { key: 'linkedin', label: 'LinkedIn' },
 ];
 
 const RANGE_OPTIONS: { key: RangeFilter; label: string }[] = [
@@ -222,6 +224,39 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
     return { leadsData: data, formKeys: Array.from(allKeys) };
   }, [filtered]);
 
+  // ── Chart 7+8: LinkedIn engagement + impressions ─────────────
+  const { liEngagementData, liImpressionData, liAccountKeys } = useMemo(() => {
+    const rows = filtered.filter((r) => r.source === 'linkedin');
+    const allAccounts = new Set<string>();
+
+    const engData = rows.map((r) => {
+      const point: Record<string, number | string> = {
+        date: r.period_start,
+        overall: r.metrics.avg_engagement_rate ?? 0,
+      };
+      for (const [name, acc] of Object.entries(r.metrics.by_account ?? {})) {
+        point[name] = acc.avg_engagement_rate;
+        allAccounts.add(name);
+      }
+      return point;
+    });
+
+    const impData = rows.map((r) => {
+      const point: Record<string, number | string> = { date: r.period_start };
+      for (const [name, acc] of Object.entries(r.metrics.by_account ?? {})) {
+        point[name] = acc.total_impressions;
+        allAccounts.add(name);
+      }
+      return point;
+    });
+
+    return {
+      liEngagementData: engData,
+      liImpressionData: impData,
+      liAccountKeys: Array.from(allAccounts),
+    };
+  }, [filtered]);
+
   // ── Visibility by source filter ───────────────────────────────
   const show = {
     ga4:      source === 'all' || source === 'ga4',
@@ -229,6 +264,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
     youtube:  source === 'all' || source === 'youtube',
     brevo:    source === 'all' || source === 'brevo',
     leads:    source === 'all' || source === 'leads',
+    linkedin: source === 'all' || source === 'linkedin',
   };
 
   const tickFmt = makeTickFormatter(period);
@@ -441,10 +477,76 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
           </ChartCard>
         )}
 
+        {/* 7 — LinkedIn Avg Engagement Rate */}
+        {show.linkedin && (
+          <ChartCard
+            title="LinkedIn Avg Engagement Rate"
+            description="Average engagement rate per period — overall and per account"
+            hasData={liEngagementData.length >= 3}
+            period={period}
+          >
+            <ResponsiveContainer width="100%" height={220}>
+              <LineChart data={liEngagementData} margin={{ left: 0, right: 8, top: 4, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={tickFmt} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, 'auto']} />
+                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, '']} />
+                {liAccountKeys.length > 0 && <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />}
+                <Line type="monotone" dataKey="overall" name="Overall" stroke="#0077B5" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+                {liAccountKeys.map((name, i) => (
+                  <Line
+                    key={name}
+                    type="monotone"
+                    dataKey={name}
+                    name={name}
+                    stroke={LI_ACCOUNT_PALETTE[(i + 1) % LI_ACCOUNT_PALETTE.length]}
+                    strokeWidth={1.5}
+                    dot={false}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        )}
+
+        {/* 8 — LinkedIn Total Impressions (stacked by account) */}
+        {show.linkedin && (
+          <ChartCard
+            title="LinkedIn Total Impressions"
+            description="Total impressions per period, stacked by account"
+            hasData={liImpressionData.length >= 3}
+            period={period}
+          >
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={liImpressionData} margin={{ left: 0, right: 8, top: 4, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tickFormatter={tickFmt} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown, name: unknown) => [(v as number).toLocaleString(), String(name)]} />
+                {liAccountKeys.length > 1 && <Legend iconType="rect" iconSize={8} wrapperStyle={{ fontSize: 11 }} />}
+                {liAccountKeys.length > 0 ? (
+                  liAccountKeys.map((name, i) => (
+                    <Bar
+                      key={name}
+                      dataKey={name}
+                      stackId="li"
+                      fill={LI_ACCOUNT_PALETTE[i % LI_ACCOUNT_PALETTE.length]}
+                      radius={i === liAccountKeys.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
+                    />
+                  ))
+                ) : (
+                  <Bar dataKey="total_impressions" name="Impressions" fill="#0077B5" radius={[3, 3, 0, 0]} />
+                )}
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+        )}
+
       </div>
 
       {/* ── Empty state when no source data matches the filter ── */}
-      {!show.ga4 && !show.gsc && !show.youtube && !show.brevo && !show.leads && (
+      {!show.ga4 && !show.gsc && !show.youtube && !show.brevo && !show.leads && !show.linkedin && (
         <div className="py-16 text-center text-muted-foreground">
           <p>No charts to show for the selected filters.</p>
         </div>

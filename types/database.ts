@@ -457,9 +457,31 @@ export interface NormalizedMetrics {
   clean_count?: number;
   india_count?: number;
   by_form?: Record<string, number>;
+
+  // LinkedIn (linkedin) — aggregated from linkedin_posts for the period
+  posts_published?: number;
+  /** Total impressions across all LinkedIn posts in the period (distinct from GSC `impressions`) */
+  total_impressions?: number;
+  avg_engagement_rate?: number;
+  total_reactions?: number;
+  total_comments?: number;
+  total_shares?: number;
+  best_post?: {
+    post_date: string;
+    account_name: string;
+    post_text_preview: string;
+    impressions: number;
+    engagement_rate: number;
+    post_url: string | null;
+  };
+  by_account?: Record<string, {
+    posts: number;
+    avg_engagement_rate: number;
+    total_impressions: number;
+  }>;
 }
 
-export type MetricSnapshotSource = 'ga4_main' | 'ga4_es' | 'gsc_main' | 'gsc_es' | 'youtube' | 'brevo' | 'leads';
+export type MetricSnapshotSource = 'ga4_main' | 'ga4_es' | 'gsc_main' | 'gsc_es' | 'youtube' | 'brevo' | 'leads' | 'linkedin';
 
 export interface MetricSnapshotRow {
   id: string;

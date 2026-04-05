@@ -1,9 +1,10 @@
+import Link from 'next/link';
+import { ChevronLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { MisDashboardClient } from '@/components/analytics/mis/mis-dashboard-client';
 import type {
   UserRoleEnum,
   MisSnapshot,
-  MisHighlight,
   WidgetConfig,
   GA4SnapshotData,
   GscSnapshotData,
@@ -51,15 +52,7 @@ export default async function MisDashboardPage() {
   const youtube = latestFor('youtube', 'default');
   const brevo = latestFor('brevo', 'default');
 
-  // Fetch latest highlight
-  const { data: highlightRow } = await supabase
-    .from('mis_highlights')
-    .select('*')
-    .order('period_start', { ascending: false })
-    .limit(1)
-    .single();
-
-  const latestHighlight = (highlightRow as MisHighlight | null) || null;
+  // AI highlights are no longer shown on the MIS page — they live on /dashboard only.
 
   // Fetch user's dashboard config
   const { data: configRow } = await supabase
@@ -96,10 +89,15 @@ export default async function MisDashboardPage() {
 
   return (
     <div className="p-6 space-y-4">
+      {/* Breadcrumb */}
       <div>
-        <h1 className="text-2xl font-bold">Marketing MIS Dashboard</h1>
+        <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-3">
+          <ChevronLeft className="h-3.5 w-3.5" />
+          Back to Dashboard
+        </Link>
+        <h1 className="text-2xl font-bold">Detailed MIS Dashboard</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Unified performance view across GA4, Search Console, YouTube, and Brevo
+          Full analytics drill-down — GA4, Search Console, YouTube, and Brevo
         </p>
       </div>
 
@@ -112,7 +110,6 @@ export default async function MisDashboardPage() {
           youtube: youtube?.data as YoutubeSnapshotData | undefined,
           brevo: brevo?.data as BrevoSnapshotData | undefined,
         }}
-        latestHighlight={latestHighlight}
         initialConfig={initialConfig}
         isAdmin={isAdmin}
         hasGA4Main={hasGA4Main}

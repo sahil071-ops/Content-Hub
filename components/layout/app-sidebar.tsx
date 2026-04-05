@@ -44,6 +44,36 @@ const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     roles: ['admin', 'marketing'],
   },
+];
+
+const ANALYTICS_NAV_ITEMS: NavItem[] = [
+  {
+    label: 'Trends',
+    href: '/analytics/trends',
+    icon: TrendingUp,
+    roles: ['admin', 'marketing'],
+  },
+  {
+    label: 'Content Analytics',
+    href: '/analytics/content',
+    icon: BarChart2,
+    roles: ['admin', 'marketing', 'sales'],
+  },
+  {
+    label: 'Detailed MIS',
+    href: '/analytics/mis',
+    icon: History,
+    roles: ['admin', 'marketing'],
+  },
+  {
+    label: 'Pull History',
+    href: '/analytics/mis/history',
+    icon: BarChart2,
+    roles: ['admin'],
+  },
+];
+
+const CONTENT_NAV_ITEMS: NavItem[] = [
   {
     label: 'Content Library',
     href: '/library',
@@ -54,33 +84,6 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Upload Content',
     href: '/upload',
     icon: Upload,
-    roles: ['admin', 'marketing'],
-  },
-];
-
-const ANALYTICS_NAV_ITEMS: NavItem[] = [
-  {
-    label: 'Content Analytics',
-    href: '/analytics/content',
-    icon: BarChart2,
-    roles: ['admin', 'marketing', 'sales'],
-  },
-  {
-    label: 'MIS Dashboard',
-    href: '/analytics/mis',
-    icon: TrendingUp,
-    roles: ['admin', 'marketing'],
-  },
-  {
-    label: 'Pull History',
-    href: '/analytics/mis/history',
-    icon: History,
-    roles: ['admin', 'marketing'],
-  },
-  {
-    label: 'Trends',
-    href: '/analytics/trends',
-    icon: BarChart2,
     roles: ['admin', 'marketing'],
   },
 ];
@@ -178,6 +181,7 @@ export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCo
 
   const visibleNav = NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleAnalytics = ANALYTICS_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
+  const visibleContent = CONTENT_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleLinkedIn = LINKEDIN_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleLeads = LEADS_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
   const visibleAdmin = ADMIN_NAV_ITEMS.filter((item) => item.roles.includes(userRole));
@@ -295,6 +299,25 @@ export function AppSidebar({ userRole, onNavigate, collapsed = false, onToggleCo
               )}
               <nav className="space-y-1">
                 {visibleLeads.map((item) => (
+                  <NavLink key={item.href} item={item} />
+                ))}
+              </nav>
+            </>
+          )}
+
+          {/* Content section */}
+          {visibleContent.length > 0 && (
+            <>
+              <Separator className="my-4 bg-white/10" />
+              {!collapsed && (
+                <div className="px-3 mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-white/30">
+                    Content
+                  </span>
+                </div>
+              )}
+              <nav className="space-y-1">
+                {visibleContent.map((item) => (
                   <NavLink key={item.href} item={item} />
                 ))}
               </nav>
