@@ -13,10 +13,11 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 
 ## Current Version & Changelog Summary
 
-**Current version: 0.5.0** (package.json)
+**Current version: 0.6.0** (package.json)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v0.6.0 | 2026-04-05 | LinkedIn snapshot system, LinkedIn hero metric + detail card on dashboard, LinkedIn Trends charts, dashboard consolidation (cross-links, removed AI Highlights from MIS, sidebar restructure) |
 | v0.5.0 | 2026-04-04 | Snapshot-based historical tracking, Trends dashboard, AI highlights from 8-week history, YouTube subscriber growth, Brevo diagnostic |
 | v0.4.0 | 2026-04-03 | Dashboard redesign, 6 bug fixes, email verification, cron jobs, language tags |
 | v0.3.0 | 2026-03-25 | MIS dashboard redesign, favicon, content previews, CRM lead detail improvements |
@@ -119,7 +120,7 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 | `mis_snapshots` | Analytics data by source/period (legacy) | source, property, period_type, period_start, period_end, data (JSONB) |
 | `mis_pull_logs` | Log of each analytics pull | status, error_message, pulled_at |
 | `mis_highlights` | AI-generated marketing highlights | period_start/end, highlights (JSONB array), feedback (JSONB) |
-| `metric_snapshots` | Normalised metrics per source per pull (migration 015) | snapshot_type, period_start, period_end, source, metrics (JSONB); index on (snapshot_type, source, period_start) |
+| `metric_snapshots` | Normalised metrics per source per pull (migration 015) | snapshot_type, period_start, period_end, source (`ga4_main`\|`ga4_es`\|`gsc_main`\|`gsc_es`\|`youtube`\|`brevo`\|`leads`\|`linkedin`), metrics (JSONB); index on (snapshot_type, source, period_start) |
 | `youtube_snapshots` | Point-in-time subscriber count at each pull (migration 015) | subscriber_count, total_view_count, pulled_at |
 | `content_targets` | Target % by tag for content mix | tag_name, tag_type, target_percentage |
 | `dashboard_configs` | User dashboard layout preferences | user_id, dashboard_name, config (JSONB) |
@@ -248,7 +249,7 @@ vercel.json                                → Cron job schedules (5 jobs, all o
 | `AppShell` | All authenticated pages |
 | `SystemHealthBanner` | All authenticated pages (shows missing env vars) |
 | `MisDashboardClient` | `/analytics/mis` |
-| `AiHighlightsPanel` | `/analytics/mis`, `/dashboard` |
+| `AiHighlightsPanel` | `/dashboard` |
 | `DashboardClient` | `/dashboard` |
 | `ContentGrid` + `ContentCard` | `/library` |
 | `ContentFilters` + `ContentSearch` | `/library` |
@@ -266,6 +267,7 @@ vercel.json                                → Cron job schedules (5 jobs, all o
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-04-05 | v0.6.0 | LinkedIn snapshot system: `storeLinkedInSnapshot()` aggregates `linkedin_posts` by period (published posts, impressions, engagement rate, per-account breakdown, best post); called from weekly/monthly crons + manual pull. LinkedIn hero metric (6th card) + detail card on dashboard (4-across scorecards, best-post callout, per-account breakdown). LinkedIn Trends charts (Chart 7: engagement rate line, Chart 8: impressions stacked bar). Dashboard cross-links to MIS sections. Removed AI Highlights from `/analytics/mis` (only on `/dashboard`); added dismissible banner + breadcrumb to MIS. Sidebar restructured: Dashboard standalone, Content section added, Analytics items reordered (Trends first). |
 | 2026-04-04 | v0.5.0 | Parts 1-6: Brevo diagnostic endpoint + UI button; metric_snapshots + youtube_snapshots tables (migration 015); snapshot-weekly + snapshot-monthly cron endpoints; manual pull writes to metric_snapshots; dashboard comparison uses snapshot deltas; YouTube subscriber growth from snapshots; /analytics/trends page (6 charts); AI highlights rewritten to use 8-week snapshot history; backfill script for legacy mis_snapshots |
 | 2026-04-03 | v0.4.0 | Fixed 6 bugs (LinkedIn dates/payload/AI rules/Zoho dates/YouTube zeros/Brevo errors); added email verification via Abstract API; added language tags; added Vercel cron jobs; rebuilt /dashboard with AI highlights + number strip + detail cards; added PROJECT_DOCS.md |
 | 2026-04-03 | v0.4.0 | Fixed Vercel Hobby plan cron limit: removed process-leads (*/15) and pull-zoho-leads (*/4h) from schedule; added /api/leads/wpforms webhook for synchronous WPForms lead processing; Zoho pull moved to once daily (0 2 * * *); 5 crons remain, all ≤ once/day |

@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
-  ChevronDown, ChevronUp, RefreshCw, ThumbsUp, ThumbsDown,
+  ChevronDown, ChevronUp, ChevronRight, RefreshCw, ThumbsUp, ThumbsDown,
   TrendingUp, TrendingDown, Minus, Sparkles,
-  Youtube, Globe, Mail, Users, BarChart3,
+  Youtube, Globe, Mail, Users, BarChart3, Linkedin, ExternalLink,
   AlertTriangle, Lightbulb, Trophy, Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -105,6 +106,17 @@ function DetailSection({
   );
 }
 
+// ── Cross-link to full analytics ────────────────────────────────
+function ViewFullLink({ href, label }: { href: string; label: string }) {
+  return (
+    <div className="flex justify-end pt-2 border-t">
+      <Link href={href} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+        View full {label} <ChevronRight className="h-3 w-3" />
+      </Link>
+    </div>
+  );
+}
+
 // ── Highlight card ───────────────────────────────────────────────
 const HIGHLIGHT_META: Record<string, { border: string; bg: string; icon: React.ElementType; iconColor: string }> = {
   WIN:         { border: 'border-emerald-400', bg: 'bg-emerald-500/5', icon: Trophy,      iconColor: 'text-emerald-500' },
@@ -173,6 +185,9 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, 
   const yt     = data['youtube']             as any;
   const brevo  = data['brevo']               as any;
   const leads  = leadCounts[period]          || { total: 0, spam: 0, high_value: 0 };
+
+  // LinkedIn data always comes from metric_snapshots (no legacy mis_snapshots row)
+  const liSnap = snap('linkedin');
 
   // ── Snapshot-based comparison helpers ───────────────────────
   /** Get current/prev metrics from metric_snapshots for a given source. */
@@ -264,6 +279,14 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, 
       label: 'New Leads', value: fmt(leads.total),
       delta: snapDelta('leads', 'total_leads'),
     },
+    {
+      icon: Linkedin, color: 'text-blue-600', bg: 'bg-blue-600/10',
+      label: 'LinkedIn Engagement', value: liSnap?.current?.avg_engagement_rate != null
+        ? `${liSnap.current.avg_engagement_rate.toFixed(2)}%`
+        : '—',
+      delta: snapDelta('linkedin', 'avg_engagement_rate'),
+      scrollTo: 'detail-linkedin',
+    },
   ];
 
   // ── Summaries ────────────────────────────────────────────────
@@ -295,11 +318,12 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, 
               <Sparkles className="h-5 w-5 text-[#2323A3]" />
               Dashboard
             </h1>
-            {lastPullAt && (
-              <p className="text-xs text-muted-foreground">
-                Last updated {new Date(lastPullAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground">
+              {lastPullAt
+                ? `Last updated ${new Date(lastPullAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} · `
+                : ''}
+              <Link href="/analytics/mis" className="underline hover:text-foreground">Detailed MIS →</Link>
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {/* Period toggle */}
@@ -347,11 +371,11 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, 
       {/* ── Section 2: Number Strip ───────────────────────────── */}
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Key Numbers</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {heroMetrics.map((m) => {
             const Icon = m.icon;
-            return (
-              <div key={m.label} className="rounded-lg border bg-card p-4 space-y-2">
+            const card = (
+              <div key={m.label} className={cn('rounded-lg border bg-card p-4 space-y-2', (m as any).scrollTo ? 'cursor-pointer hover:border-primary/50 transition-colors' : '')}>
                 <div className={cn('inline-flex h-8 w-8 items-center justify-center rounded-md', m.bg)}>
                   <Icon className={cn('h-4 w-4', m.color)} />
                 </div>
@@ -364,6 +388,9 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, 
                 </div>
               </div>
             );
+            return (m as any).scrollTo
+              ? <a key={m.label} href={`#${(m as any).scrollTo}`}>{card}</a>
+              : card;
           })}
         </div>
       </section>
@@ -416,6 +443,7 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, 
                   <RechartsLine data={yt.timeline} series={[{ key: 'views', label: 'Views', color: '#EF4444' }]} height={160} />
                 </div>
               )}
+              <ViewFullLink href="/analytics/mis#section-youtube" label="YouTube analytics" />
             </div>
           ) : <p className="text-sm text-muted-foreground">No YouTube data for this period.</p>}
         </DetailSection>
@@ -514,6 +542,7 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, 
                   )}
                 </div>
               )}
+              <ViewFullLink href="/analytics/mis#section-gsc-main" label="Search Console analytics" />
             </div>
           ) : <p className="text-sm text-muted-foreground">No website data for this period.</p>}
         </DetailSection>
@@ -569,6 +598,7 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, 
                   </div>
                 </div>
               )}
+              <ViewFullLink href="/analytics/mis#section-gsc-es" label="Spanish site analytics" />
             </div>
           ) : <p className="text-sm text-muted-foreground">No Spanish site data for this period.</p>}
         </DetailSection>
@@ -621,6 +651,7 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, 
                   </table>
                 </div>
               )}
+              <ViewFullLink href="/analytics/mis#section-brevo" label="Brevo email analytics" />
             </div>
           ) : <p className="text-sm text-muted-foreground">No email data for this period.</p>}
         </DetailSection>
@@ -662,7 +693,161 @@ export function DashboardClient({ byPeriod, highlights, leadCounts, lastPullAt, 
             )}
           </div>
         </DetailSection>
+
+        {/* LinkedIn */}
+        <div id="detail-linkedin">
+          <DetailSection
+            title="LinkedIn"
+            icon={Linkedin}
+            iconColor="text-blue-600"
+            heroValue={liSnap?.current?.avg_engagement_rate != null
+              ? `${liSnap.current.avg_engagement_rate.toFixed(2)}%`
+              : '—'}
+            heroLabel="avg engagement"
+            delta={snapDelta('linkedin', 'avg_engagement_rate')}
+            oneLine={liSnap?.current
+              ? `${liSnap.current.posts_published ?? 0} posts · ${fmt(liSnap.current.total_impressions)} impressions`
+              : 'No LinkedIn data for this period.'}
+          >
+            {liSnap?.current ? (
+              <LinkedInDetailContent
+                metrics={liSnap.current}
+                prevMetrics={liSnap.prev}
+                hasBaseline={liSnap.hasBaseline}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No LinkedIn data for this period.
+                {liSnap?.hasBaseline && <span className="italic"> Baseline set — comparison available after next snapshot.</span>}
+              </p>
+            )}
+          </DetailSection>
+        </div>
       </section>
+    </div>
+  );
+}
+
+// ── LinkedIn detail content (collapsed section body) ────────────
+function LinkedInDetailContent({
+  metrics, prevMetrics, hasBaseline,
+}: {
+  metrics: NormalizedMetrics;
+  prevMetrics: NormalizedMetrics | null;
+  hasBaseline: boolean;
+}) {
+  function liDelta(key: keyof NormalizedMetrics) {
+    const cur = metrics[key] as number | undefined;
+    const pre = prevMetrics?.[key] as number | undefined;
+    return (
+      <Delta
+        current={cur ?? null}
+        prev={pre ?? null}
+        baselineSet={hasBaseline}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* 4-across scorecard row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-md border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Posts Published</p>
+          <p className="text-lg font-bold">{metrics.posts_published ?? 0}</p>
+        </div>
+        <div className="rounded-md border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Total Impressions</p>
+          <p className="text-lg font-bold">{fmt(metrics.total_impressions)}</p>
+          {liDelta('total_impressions')}
+        </div>
+        <div className="rounded-md border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 p-3">
+          <p className="text-xs text-muted-foreground">Avg Engagement Rate</p>
+          <p className="text-2xl font-bold text-blue-600">{metrics.avg_engagement_rate?.toFixed(2) ?? '0'}%</p>
+          {liDelta('avg_engagement_rate')}
+        </div>
+        <div className="rounded-md border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Reactions + Comments + Shares</p>
+          <p className="text-lg font-bold">
+            {((metrics.total_reactions ?? 0) + (metrics.total_comments ?? 0) + (metrics.total_shares ?? 0)).toLocaleString()}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {metrics.total_reactions ?? 0}r · {metrics.total_comments ?? 0}c · {metrics.total_shares ?? 0}s
+          </p>
+        </div>
+      </div>
+
+      {/* Best post callout */}
+      {metrics.best_post && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 p-4 space-y-2">
+          <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">⭐ Best performing post this period</p>
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 h-9 w-9 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold">
+              {(metrics.best_post.account_name || 'U').slice(0, 1).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-semibold">{metrics.best_post.account_name}</span>
+                <span className="text-xs text-muted-foreground">{metrics.best_post.post_date}</span>
+                <span className="inline-flex items-center rounded-full bg-emerald-500 text-white px-2 py-0.5 text-xs font-bold">
+                  {metrics.best_post.engagement_rate?.toFixed(2)}% eng
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{metrics.best_post.post_text_preview}</p>
+              <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                <span>{metrics.best_post.impressions.toLocaleString()} impressions</span>
+                {metrics.best_post.post_url && (
+                  <a
+                    href={metrics.best_post.post_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-0.5 hover:text-foreground transition-colors"
+                  >
+                    <ExternalLink className="h-3 w-3" /> View post
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Per-account mini breakdown */}
+      {metrics.by_account && Object.keys(metrics.by_account).length > 0 && (
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">By Account</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {Object.entries(metrics.by_account).map(([name, acc]) => {
+              const prevAcc = prevMetrics?.by_account?.[name];
+              const engDelta = prevAcc
+                ? ((acc.avg_engagement_rate - prevAcc.avg_engagement_rate) / (prevAcc.avg_engagement_rate || 1)) * 100
+                : null;
+              return (
+                <div key={name} className="rounded-md border bg-muted/20 p-3 space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-6 w-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                      {name.slice(0, 1).toUpperCase()}
+                    </div>
+                    <span className="text-xs font-semibold truncate">{name}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{acc.posts} post{acc.posts !== 1 ? 's' : ''}</p>
+                  <div className="flex items-baseline gap-1.5">
+                    <p className="text-base font-bold">{acc.avg_engagement_rate.toFixed(2)}%</p>
+                    {engDelta !== null && Math.abs(engDelta) >= 1 && (
+                      <span className={cn('text-xs font-semibold', engDelta > 0 ? 'text-emerald-500' : 'text-red-500')}>
+                        {engDelta > 0 ? '+' : ''}{engDelta.toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">{fmt(acc.total_impressions)} impressions</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <ViewFullLink href="/linkedin/dashboard" label="LinkedIn analytics" />
     </div>
   );
 }

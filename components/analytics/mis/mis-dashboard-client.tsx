@@ -1,16 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { X } from 'lucide-react';
 import { DashboardControls } from './dashboard-controls';
 import { DashboardLayout } from './dashboard-layout';
-import { AiHighlightsPanel } from '@/components/analytics/ai-highlights-panel';
 import { YouTubeSection } from './youtube-section';
 import { SearchConsoleSection } from './search-console-section';
 import { GA4Section } from './ga4-section';
 import { BrevoSection } from './brevo-section';
 import { cn } from '@/lib/utils';
 import type {
-  MisHighlight,
   MisPeriodTypeEnum,
   WidgetConfig,
   GA4SnapshotData,
@@ -35,7 +35,6 @@ interface YoutubeSnapshotPoint {
 
 interface MisDashboardClientProps {
   snapshots: SnapshotMap;
-  latestHighlight: MisHighlight | null;
   initialConfig: WidgetConfig[];
   isAdmin: boolean;
   hasGA4Main: boolean;
@@ -91,7 +90,6 @@ function SectionCard({
 
 export function MisDashboardClient({
   snapshots,
-  latestHighlight,
   initialConfig,
   isAdmin,
   hasGA4Main,
@@ -105,6 +103,14 @@ export function MisDashboardClient({
 }: MisDashboardClientProps) {
   const [periodType, setPeriodType] = useState<MisPeriodTypeEnum>('monthly');
   const [countryFilter, setCountryFilter] = useState<'all' | 'india'>('all');
+  const [bannerDismissed, setBannerDismissed] = useState(true); // start hidden to avoid SSR flash
+  useEffect(() => {
+    setBannerDismissed(localStorage.getItem('mis_detail_banner_dismissed') === '1');
+  }, []);
+  function dismissBanner() {
+    localStorage.setItem('mis_detail_banner_dismissed', '1');
+    setBannerDismissed(true);
+  }
 
   // Build the list of active sections for the mini nav
   const navSections: { id: string; label: string; colorKey: keyof typeof SOURCE_COLORS }[] = [
@@ -250,8 +256,18 @@ export function MisDashboardClient({
         )}
       </div>
 
-      {/* ── AI Highlights — full width, always first ── */}
-      <AiHighlightsPanel highlight={latestHighlight} />
+      {/* ── Dismissible info banner ── */}
+      {!bannerDismissed && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 text-sm text-blue-800 dark:text-blue-300 mb-2">
+          <span>
+            This is the detailed analytics drill-down. For your weekly summary and AI insights, visit the{' '}
+            <Link href="/dashboard" className="font-medium underline hover:no-underline">Dashboard</Link>.
+          </span>
+          <button onClick={dismissBanner} aria-label="Dismiss" className="shrink-0 opacity-60 hover:opacity-100 transition-opacity">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* ── Configurable widget layout (sections wrapped in SectionCard above) ── */}
       <div className="mt-6">

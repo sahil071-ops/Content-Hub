@@ -6,6 +6,34 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [v0.6.0] — 2026-04-05
+
+### Added — LinkedIn snapshots + dashboard consolidation
+
+**Part 1 — LinkedIn snapshot system**
+- `'linkedin'` added to `MetricSnapshotSource`; LinkedIn fields added to `NormalizedMetrics`: `posts_published`, `total_impressions`, `avg_engagement_rate`, `total_reactions`, `total_comments`, `total_shares`, `best_post`, `by_account`
+- `storeLinkedInSnapshot()` added to `lib/analytics/snapshot-store.ts` — queries `linkedin_posts` (published only, filtered by `post_date`) joined to `linkedin_accounts`; aggregates per-account and overall stats; always stores a row (with zeros) even when no posts exist so the timeline is preserved
+- All three pull triggers now call `storeLinkedInSnapshot`: `/api/cron/snapshot-weekly`, `/api/cron/snapshot-monthly`, `/api/analytics/pull`
+
+**Part 2 — LinkedIn on Dashboard**
+- LinkedIn is the 6th metric in the hero number strip: avg engagement rate with delta vs previous snapshot; clicking the card scrolls to the detail section
+- LinkedIn detail card added (collapsed by default): 4-across scorecard (posts, impressions, avg engagement, reactions+comments+shares), best-post callout card with account initial, date, text preview, engagement badge and link, per-account mini breakdown with deltas
+- Dashboard subtitle added: "Detailed MIS →" cross-link under the page title
+- "View full [source] analytics →" cross-links added at the bottom of each detail section (YouTube → `/analytics/mis#section-youtube`, Website → GSC, Spanish site → GSC ES, Email → Brevo, LinkedIn → `/linkedin/dashboard`)
+
+**Part 3 — LinkedIn on Trends**
+- `'linkedin'` source filter option added to `/analytics/trends`
+- Chart 7: LinkedIn Avg Engagement Rate — line chart with one dashed line for overall average + one solid line per account (dynamic from `by_account` data)
+- Chart 8: LinkedIn Total Impressions — stacked bar chart per account (dynamic account keys)
+
+**Part 4 — Dashboard consolidation**
+- AI Highlights panel removed from `/analytics/mis` — now lives exclusively on `/dashboard`
+- `/analytics/mis` page: "← Back to Dashboard" breadcrumb added; page title changed to "Detailed MIS Dashboard"; subtitle updated to describe it as the drill-down view
+- `/analytics/mis` client: dismissible info banner added — "This is the detailed analytics view. Visit the Dashboard." — dismissed state stored in `localStorage`
+- Sidebar navigation restructured: Dashboard is standalone at top; Analytics section now has Trends (first), Content Analytics, Detailed MIS, Pull History (admin only); Content Library and Upload Content moved to a new "Content" section; all other sections (LinkedIn, CRM Leads, Admin) unchanged
+
+---
+
 ## [v0.5.0] — 2026-04-04
 
 ### Added — Migration SQL + backfill script (Part 6)

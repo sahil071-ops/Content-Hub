@@ -5,7 +5,7 @@ import { fetchSearchConsoleData } from '@/lib/analytics/search-console';
 import { fetchYouTubeData } from '@/lib/analytics/youtube';
 import { fetchBrevoData } from '@/lib/analytics/brevo';
 import { getPeriodDates } from '@/lib/analytics/periods';
-import { storeMetricSnapshots, storeLeadsSnapshot } from '@/lib/analytics/snapshot-store';
+import { storeMetricSnapshots, storeLeadsSnapshot, storeLinkedInSnapshot } from '@/lib/analytics/snapshot-store';
 import type { MisSourceEnum } from '@/types/database';
 
 /**
@@ -117,6 +117,14 @@ export async function GET(request: NextRequest) {
     logs.push({ source: 'leads', status: 'success' });
   } catch (e: unknown) {
     logs.push({ source: 'leads', status: 'failed', error: e instanceof Error ? e.message : String(e) });
+  }
+
+  // Store LinkedIn snapshot from linkedin_posts table
+  try {
+    await storeLinkedInSnapshot('monthly', startDate, endDate, serviceClient);
+    logs.push({ source: 'linkedin', status: 'success' });
+  } catch (e: unknown) {
+    logs.push({ source: 'linkedin', status: 'failed', error: e instanceof Error ? e.message : String(e) });
   }
 
   // Log to mis_pull_logs

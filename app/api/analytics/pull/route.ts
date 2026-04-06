@@ -6,7 +6,7 @@ import { fetchYouTubeData } from '@/lib/analytics/youtube';
 import { fetchBrevoData } from '@/lib/analytics/brevo';
 import { generateMisHighlights } from '@/lib/analytics/ai-highlights';
 import { getPeriodDates } from '@/lib/analytics/periods';
-import { storeMetricSnapshots, storeLeadsSnapshot } from '@/lib/analytics/snapshot-store';
+import { storeMetricSnapshots, storeLeadsSnapshot, storeLinkedInSnapshot } from '@/lib/analytics/snapshot-store';
 import type { MisPeriodTypeEnum, MisSourceEnum } from '@/types/database';
 
 // Allow up to 5 minutes for a full pull
@@ -156,6 +156,9 @@ async function runPull(periodType: MisPeriodTypeEnum, serviceSupabase: ReturnTyp
     } catch { /* non-critical — raw mis_snapshots already stored */ }
     try {
       await storeLeadsSnapshot(periodType, startDate, endDate, serviceSupabase);
+    } catch { /* non-critical */ }
+    try {
+      await storeLinkedInSnapshot(periodType, startDate, endDate, serviceSupabase);
     } catch { /* non-critical */ }
   }
 
