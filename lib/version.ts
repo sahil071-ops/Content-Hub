@@ -29,6 +29,6 @@ const dateTimeLabel = dateLabel
 // e.g. "13 Mar 2026 11:23 · abc1234"  or just  "13 Mar 2026 11:23"  or fallback "0.1.0"
 export const VERSION = dateTimeLabel
   ? buildId ? `${dateTimeLabel} · ${buildId}` : dateTimeLabel
-  : buildId ? `build ${buildId}` : '0.6.0';
+  : buildId ? `build ${buildId}` : '0.7.0';
 
 export const APP_NAME = 'Axis Content Hub';

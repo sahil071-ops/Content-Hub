@@ -1,27 +1,44 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import type { UserRoleEnum, MisSnapshot, MisPullLog } from '@/types/database';
+import type { UserRoleEnum, MisPullLog } from '@/types/database';
 import type { Metadata } from 'next';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { BrevoTestPanel } from './brevo-test-panel';
+import { CronStatusPanel, BackfillPanel } from './history-panels';
 
 export const metadata: Metadata = { title: 'MIS Pull History' };
 export const dynamic = 'force-dynamic';
-
-const SOURCE_COLORS: Record<string, string> = {
-  ga4: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-  search_console: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  youtube: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-  brevo: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-};
 
 const STATUS_COLORS: Record<string, string> = {
   success: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
   failed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
   partial: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
 };
+
+const SOURCE_CHIP: Record<string, string> = {
+  ga4_main:       'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  ga4_es:         'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  gsc_main:       'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  gsc_es:         'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  youtube:        'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  brevo:          'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  leads:          'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+  linkedin:       'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300',
+  // legacy labels
+  ga4:            'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  search_console: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+};
+
+interface MetricSnapshotRow {
+  id: string;
+  snapshot_type: string;
+  source: string;
+  period_start: string;
+  period_end: string;
+  pulled_at: string;
+}
 
 export default async function MisHistoryPage() {
   const supabase = createClient();
@@ -30,13 +47,24 @@ export default async function MisHistoryPage() {
   if (!authUser) redirect('/login');
 
   const { data: profile } = await supabase.from('users').select('role').eq('id', authUser.id).single();
-  const role = ((profile as any)?.role || 'viewer') as UserRoleEnum;
+  const role = ((profile as { role?: string } | null)?.role || 'viewer') as UserRoleEnum;
   if (!['admin', 'marketing'].includes(role)) redirect('/library');
+  const isAdmin = role === 'admin';
 
-  const [{ data: logs }, { data: snapshots }] = await Promise.all([
+  const [{ data: logs }, { data: metricSnaps }] = await Promise.all([
     supabase.from('mis_pull_logs').select('*').order('pulled_at', { ascending: false }).limit(100),
-    supabase.from('mis_snapshots').select('id, source, property, period_type, period_start, period_end, data, pulled_at, created_at').order('period_start', { ascending: false }).limit(50),
+    supabase
+      .from('metric_snapshots')
+      .select('id, snapshot_type, source, period_start, period_end, pulled_at')
+      .order('period_start', { ascending: false })
+      .limit(100),
   ]);
+
+  // Derive last successful pull timestamps per period type from logs
+  const weeklyLogs = (logs ?? []).filter((l: MisPullLog) => l.period_type === 'weekly' && l.status === 'success');
+  const monthlyLogs = (logs ?? []).filter((l: MisPullLog) => l.period_type === 'monthly' && l.status === 'success');
+  const lastWeeklyPulled = weeklyLogs.length > 0 ? weeklyLogs[0].pulled_at : null;
+  const lastMonthlyPulled = monthlyLogs.length > 0 ? monthlyLogs[0].pulled_at : null;
 
   return (
     <div className="p-6 space-y-6">
@@ -50,34 +78,44 @@ export default async function MisHistoryPage() {
         </div>
       </div>
 
+      {/* Cron Status + Run Now */}
+      <CronStatusPanel
+        lastWeeklyPulled={lastWeeklyPulled}
+        lastMonthlyPulled={lastMonthlyPulled}
+      />
+
+      {/* Backfill (admin only) */}
+      <BackfillPanel isAdmin={isAdmin} />
+
       {/* Brevo Diagnostic */}
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">Brevo API Diagnostic</h2>
         <BrevoTestPanel />
       </section>
 
-      {/* Snapshots */}
+      {/* Metric Snapshots (normalised table) */}
       <section>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">Stored Snapshots</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+          Metric Snapshots{' '}
+          <span className="text-xs font-normal normal-case">(used by Trends and Dashboard)</span>
+        </h2>
         <div className="rounded-lg border overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/30">
                 <th className="text-left py-2 px-4 font-medium text-muted-foreground">Source</th>
-                <th className="text-left py-2 px-4 font-medium text-muted-foreground">Property</th>
                 <th className="text-left py-2 px-4 font-medium text-muted-foreground">Period</th>
                 <th className="text-left py-2 px-4 font-medium text-muted-foreground">Date Range</th>
                 <th className="text-left py-2 px-4 font-medium text-muted-foreground">Pulled At</th>
               </tr>
             </thead>
             <tbody>
-              {(snapshots || []).map((s: MisSnapshot) => (
+              {(metricSnaps ?? []).map((s: MetricSnapshotRow) => (
                 <tr key={s.id} className="border-b border-border/50 hover:bg-muted/30">
                   <td className="py-2 px-4">
-                    <Badge className={SOURCE_COLORS[s.source] || ''}>{s.source.replace('_', ' ')}</Badge>
+                    <Badge className={SOURCE_CHIP[s.source] ?? ''}>{s.source.replace(/_/g, ' ')}</Badge>
                   </td>
-                  <td className="py-2 px-4 text-muted-foreground capitalize">{s.property}</td>
-                  <td className="py-2 px-4 capitalize">{s.period_type}</td>
+                  <td className="py-2 px-4 capitalize text-muted-foreground">{s.snapshot_type}</td>
                   <td className="py-2 px-4 text-xs text-muted-foreground">
                     {new Date(s.period_start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} –{' '}
                     {new Date(s.period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -87,8 +125,8 @@ export default async function MisHistoryPage() {
                   </td>
                 </tr>
               ))}
-              {(!snapshots || snapshots.length === 0) && (
-                <tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No snapshots yet</td></tr>
+              {(!metricSnaps || metricSnaps.length === 0) && (
+                <tr><td colSpan={4} className="py-8 text-center text-muted-foreground">No metric snapshots yet — run a pull or use the Backfill button above</td></tr>
               )}
             </tbody>
           </table>
@@ -113,7 +151,7 @@ export default async function MisHistoryPage() {
               {(logs || []).map((l: MisPullLog) => (
                 <tr key={l.id} className="border-b border-border/50 hover:bg-muted/30">
                   <td className="py-2 px-4">
-                    <Badge className={SOURCE_COLORS[l.source] || ''}>{l.source.replace('_', ' ')}</Badge>
+                    <Badge className={SOURCE_CHIP[l.source] ?? ''}>{l.source.replace(/_/g, ' ')}</Badge>
                   </td>
                   <td className="py-2 px-4 capitalize">{l.period_type}</td>
                   <td className="py-2 px-4">
