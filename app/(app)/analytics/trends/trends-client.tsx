@@ -108,12 +108,12 @@ function sortedValues<T>(map: Record<string, T>): T[] {
 
 // ── Chart wrapper ─────────────────────────────────────────────────
 function ChartCard({
-  title, description, children, hasData, period,
+  title, description, children, dataCount, period,
 }: {
   title: string;
   description: string;
   children: React.ReactNode;
-  hasData: boolean;
+  dataCount: number;
   period: PeriodFilter;
 }) {
   return (
@@ -122,14 +122,24 @@ function ChartCard({
         <h3 className="text-sm font-semibold">{title}</h3>
         <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
       </div>
-      {hasData ? (
-        children
+      {dataCount >= 1 ? (
+        <>
+          {children}
+          {dataCount < 3 && (
+            <p className="text-center text-[10px] text-muted-foreground">
+              {dataCount === 1
+                ? 'Only 1 data point — trends will appear after a few more weekly pulls'
+                : `${dataCount} data points — trends will be clearer after ${3 - dataCount} more pull${3 - dataCount > 1 ? 's' : ''}`}
+            </p>
+          )}
+        </>
       ) : (
         <div className="flex flex-col items-center justify-center py-10 text-center text-sm text-muted-foreground rounded-md bg-muted/30 border border-dashed">
-          <p className="font-medium">Not enough data yet</p>
+          <p className="font-medium">No data yet</p>
           <p className="text-xs mt-1">
-            Check back after {nextPullDate(period)} — the next scheduled{' '}
-            {period === 'monthly' ? 'monthly' : 'weekly'} pull
+            Use the <a href="/analytics/mis/history" className="underline">Pull History</a> page to run
+            a snapshot or backfill missing weeks. First pull expected:{' '}
+            {nextPullDate(period)}.
           </p>
         </div>
       )}
@@ -341,7 +351,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
           <ChartCard
             title="Organic Sessions"
             description="Sessions from organic search — main site and Spanish site"
-            hasData={ga4Data.length >= 3}
+            dataCount={ga4Data.length}
             period={period}
           >
             <ResponsiveContainer width="100%" height={220}>
@@ -351,8 +361,8 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [(v as number).toLocaleString(), '']} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="ga4_main" name="Main Site" stroke={COLORS.ga4_main} dot={false} strokeWidth={2} connectNulls />
-                <Line type="monotone" dataKey="ga4_es"   name="ES Site"   stroke={COLORS.ga4_es}   dot={false} strokeWidth={2} connectNulls />
+                <Line type="monotone" dataKey="ga4_main" name="Main Site" stroke={COLORS.ga4_main} dot={ga4Data.length < 3 ? { r: 3 } : false} strokeWidth={2} connectNulls />
+                <Line type="monotone" dataKey="ga4_es"   name="ES Site"   stroke={COLORS.ga4_es}   dot={ga4Data.length < 3 ? { r: 3 } : false} strokeWidth={2} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -363,7 +373,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
           <ChartCard
             title="Search Console Clicks"
             description="Organic clicks from Google Search — main site and Spanish site"
-            hasData={gscData.length >= 3}
+            dataCount={gscData.length}
             period={period}
           >
             <ResponsiveContainer width="100%" height={220}>
@@ -373,8 +383,8 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [(v as number).toLocaleString(), '']} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                <Line type="monotone" dataKey="gsc_main" name="Main Site" stroke={COLORS.gsc_main} dot={false} strokeWidth={2} connectNulls />
-                <Line type="monotone" dataKey="gsc_es"   name="ES Site"   stroke={COLORS.gsc_es}   dot={false} strokeWidth={2} connectNulls />
+                <Line type="monotone" dataKey="gsc_main" name="Main Site" stroke={COLORS.gsc_main} dot={gscData.length < 3 ? { r: 3 } : false} strokeWidth={2} connectNulls />
+                <Line type="monotone" dataKey="gsc_es"   name="ES Site"   stroke={COLORS.gsc_es}   dot={gscData.length < 3 ? { r: 3 } : false} strokeWidth={2} connectNulls />
               </LineChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -385,7 +395,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
           <ChartCard
             title="YouTube Views per Period"
             description="Sum of views across recent videos per pull"
-            hasData={ytViewData.length >= 3}
+            dataCount={ytViewData.length}
             period={period}
           >
             <ResponsiveContainer width="100%" height={220}>
@@ -405,7 +415,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
           <ChartCard
             title="YouTube Subscriber Count"
             description="Running total subscribers at each pull — from youtube_snapshots"
-            hasData={ytSubData.length >= 3}
+            dataCount={ytSubData.length}
             period={period}
           >
             <ResponsiveContainer width="100%" height={220}>
@@ -424,7 +434,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                   labelFormatter={(v) => { try { return format(parseISO(String(v ?? '')), 'dd MMM yyyy'); } catch { return String(v ?? ''); } }}
                   formatter={(v: unknown) => [(v as number).toLocaleString(), 'Subscribers']}
                 />
-                <Line type="monotone" dataKey="subscribers" name="Subscribers" stroke={COLORS.subscribers} dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="subscribers" name="Subscribers" stroke={COLORS.subscribers} dot={ytSubData.length < 3 ? { r: 3 } : false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -435,7 +445,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
           <ChartCard
             title="Email Open Rate"
             description="Average open rate across Brevo campaigns per period"
-            hasData={brevoData.length >= 3}
+            dataCount={brevoData.length}
             period={period}
           >
             <ResponsiveContainer width="100%" height={220}>
@@ -444,7 +454,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <XAxis dataKey="date" tickFormatter={tickFmt} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, 'auto']} />
                 <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [`${(v as number).toFixed(1)}%`, 'Open Rate']} />
-                <Line type="monotone" dataKey="open_rate" name="Open Rate" stroke={COLORS.brevo} dot={false} strokeWidth={2} />
+                <Line type="monotone" dataKey="open_rate" name="Open Rate" stroke={COLORS.brevo} dot={brevoData.length < 3 ? { r: 3 } : false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -455,7 +465,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
           <ChartCard
             title="New Leads per Period"
             description="Leads submitted per period, broken down by source / form"
-            hasData={leadsData.length >= 3}
+            dataCount={leadsData.length}
             period={period}
           >
             <ResponsiveContainer width="100%" height={220}>
@@ -482,7 +492,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
           <ChartCard
             title="LinkedIn Avg Engagement Rate"
             description="Average engagement rate per period — overall and per account"
-            hasData={liEngagementData.length >= 3}
+            dataCount={liEngagementData.length}
             period={period}
           >
             <ResponsiveContainer width="100%" height={220}>
@@ -492,7 +502,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, 'auto']} />
                 <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, '']} />
                 {liAccountKeys.length > 0 && <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />}
-                <Line type="monotone" dataKey="overall" name="Overall" stroke="#0077B5" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+                <Line type="monotone" dataKey="overall" name="Overall" stroke="#0077B5" strokeWidth={2} dot={liEngagementData.length < 3 ? { r: 3 } : false} strokeDasharray="4 2" />
                 {liAccountKeys.map((name, i) => (
                   <Line
                     key={name}
@@ -515,7 +525,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
           <ChartCard
             title="LinkedIn Total Impressions"
             description="Total impressions per period, stacked by account"
-            hasData={liImpressionData.length >= 3}
+            dataCount={liImpressionData.length}
             period={period}
           >
             <ResponsiveContainer width="100%" height={220}>

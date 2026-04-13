@@ -5,10 +5,11 @@
  *   - /api/cron/snapshot-weekly
  *   - /api/cron/snapshot-monthly
  *   - /api/analytics/pull (manual "Pull now" button)
+ *   - /api/analytics/backfill (historical backfill)
  *
  * Normalises raw pull results and writes to:
- *   - metric_snapshots  (one row per source)
- *   - youtube_snapshots (one point-in-time subscriber count)
+ *   - metric_snapshots  (one row per source, upserted — no duplicates)
+ *   - youtube_snapshots (one point-in-time subscriber count per week)
  *   - metric_snapshots  with source = 'leads' (Supabase query, not external API)
  */
 
@@ -94,8 +95,42 @@ function normalizeBrevo(data: BrevoSnapshotData): NormalizedMetrics {
 }
 
 /**
+ * Upsert a single row into metric_snapshots.
+ * Checks for an existing row with the same source + period_start + snapshot_type.
+ * If found, updates the metrics. If not found, inserts a new row.
+ */
+async function upsertMetricSnapshot(
+  serviceClient: SupabaseClient,
+  row: {
+    snapshot_type: string;
+    period_start: string;
+    period_end: string;
+    source: MetricSnapshotSource;
+    metrics: NormalizedMetrics;
+  }
+): Promise<void> {
+  const { data: existing } = await serviceClient
+    .from('metric_snapshots')
+    .select('id')
+    .eq('source', row.source)
+    .eq('period_start', row.period_start)
+    .eq('snapshot_type', row.snapshot_type)
+    .maybeSingle();
+
+  if (existing) {
+    await serviceClient
+      .from('metric_snapshots')
+      .update({ metrics: row.metrics, period_end: row.period_end })
+      .eq('id', (existing as { id: string }).id);
+  } else {
+    await serviceClient.from('metric_snapshots').insert(row);
+  }
+}
+
+/**
  * Normalize and store metric_snapshots rows for all API pull results.
- * Also writes a youtube_snapshots row for subscriber growth tracking.
+ * Uses upsert logic — safe to call multiple times for the same period.
+ * Also writes a youtube_snapshots row for subscriber growth tracking (deduplicated per week).
  */
 export async function storeMetricSnapshots(
   results: PullResult[],
@@ -117,15 +152,7 @@ export async function storeMetricSnapshots(
     prevSubscriberCount = (prevYt as { subscriber_count: number } | null)?.subscriber_count ?? null;
   }
 
-  // ── 2. Build normalised rows ─────────────────────────────────────────
-  const rows: {
-    snapshot_type: string;
-    period_start: string;
-    period_end: string;
-    source: MetricSnapshotSource;
-    metrics: NormalizedMetrics;
-  }[] = [];
-
+  // ── 2. Build normalised rows and upsert each one ─────────────────────
   for (const r of results) {
     const source = buildSource(r.source, r.property);
     if (!source) continue;
@@ -148,26 +175,45 @@ export async function storeMetricSnapshots(
       continue;
     }
 
-    rows.push({ snapshot_type: snapshotType, period_start: periodStart, period_end: periodEnd, source, metrics });
+    await upsertMetricSnapshot(serviceClient, {
+      snapshot_type: snapshotType,
+      period_start: periodStart,
+      period_end: periodEnd,
+      source,
+      metrics,
+    });
   }
 
-  if (rows.length > 0) {
-    await serviceClient.from('metric_snapshots').insert(rows);
-  }
-
-  // ── 3. Store youtube_snapshots point-in-time row ─────────────────────
+  // ── 3. Store youtube_snapshots point-in-time row (deduplicated per week) ──
   if (ytResult) {
     const ytData = ytResult.data as YoutubeSnapshotData;
-    await serviceClient.from('youtube_snapshots').insert({
-      subscriber_count: ytData.net_subscribers,
-      total_view_count: ytData.views_prev,
-    });
+
+    // Only insert if no youtube_snapshot was already taken during this period
+    const { data: existingYtSnap } = await serviceClient
+      .from('youtube_snapshots')
+      .select('id')
+      .gte('pulled_at', periodStart + 'T00:00:00')
+      .lte('pulled_at', periodEnd + 'T23:59:59')
+      .maybeSingle();
+
+    if (!existingYtSnap) {
+      await serviceClient.from('youtube_snapshots').insert({
+        subscriber_count: ytData.net_subscribers,
+        total_view_count: ytData.views_prev,
+      });
+    } else {
+      // Update existing snapshot with latest subscriber count
+      await serviceClient
+        .from('youtube_snapshots')
+        .update({ subscriber_count: ytData.net_subscribers, total_view_count: ytData.views_prev })
+        .eq('id', (existingYtSnap as { id: string }).id);
+    }
   }
 }
 
 /**
- * Query leads table for the period and store a leads snapshot row.
- * Call this after storeMetricSnapshots — it uses the same service client.
+ * Query leads table for the period and store/update a leads snapshot row.
+ * Uses upsert logic — safe to call multiple times for the same period.
  */
 export async function storeLeadsSnapshot(
   snapshotType: string,
@@ -182,16 +228,14 @@ export async function storeLeadsSnapshot(
     .gte('submitted_at', periodStart)
     .lte('submitted_at', periodEnd + 'T23:59:59');
 
-  if (!leads || leads.length === 0) return;
-
-  const totalLeads = leads.length;
-  const spamCount = leads.filter((l: { is_spam: boolean }) => l.is_spam).length;
-  const highValueCount = leads.filter((l: { is_high_value: boolean }) => l.is_high_value).length;
-  const cleanCount = leads.filter((l: { is_spam: boolean }) => !l.is_spam).length;
-  const indiaCount = leads.filter((l: { country: string | null }) => l.country === 'India').length;
+  const totalLeads = (leads ?? []).length;
+  const spamCount = (leads ?? []).filter((l: { is_spam: boolean }) => l.is_spam).length;
+  const highValueCount = (leads ?? []).filter((l: { is_high_value: boolean }) => l.is_high_value).length;
+  const cleanCount = (leads ?? []).filter((l: { is_spam: boolean }) => !l.is_spam).length;
+  const indiaCount = (leads ?? []).filter((l: { country: string | null }) => l.country === 'India').length;
 
   const byForm: Record<string, number> = {};
-  for (const l of leads as { lead_source: string | null }[]) {
+  for (const l of (leads ?? []) as { lead_source: string | null }[]) {
     const src = l.lead_source || 'Unknown';
     byForm[src] = (byForm[src] ?? 0) + 1;
   }
@@ -205,7 +249,7 @@ export async function storeLeadsSnapshot(
     by_form: byForm,
   };
 
-  await serviceClient.from('metric_snapshots').insert({
+  await upsertMetricSnapshot(serviceClient, {
     snapshot_type: snapshotType,
     period_start: periodStart,
     period_end: periodEnd,
@@ -215,7 +259,8 @@ export async function storeLeadsSnapshot(
 }
 
 /**
- * Aggregate published linkedin_posts for the period and store as source='linkedin' snapshot.
+ * Aggregate published linkedin_posts for the period and store/update source='linkedin' snapshot.
+ * Uses upsert logic — safe to call multiple times for the same period.
  * Always stores a row (with zeros) even when no posts exist — preserves the timeline.
  */
 export async function storeLinkedInSnapshot(
@@ -301,7 +346,7 @@ export async function storeLinkedInSnapshot(
     by_account: Object.keys(by_account).length > 0 ? by_account : undefined,
   };
 
-  await serviceClient.from('metric_snapshots').insert({
+  await upsertMetricSnapshot(serviceClient, {
     snapshot_type: snapshotType,
     period_start:  periodStart,
     period_end:    periodEnd,

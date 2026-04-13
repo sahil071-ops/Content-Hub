@@ -6,6 +6,35 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [v0.7.0] — 2026-04-13
+
+### Fixed — Snapshot deduplication, cron reliability, Trends data access
+
+**Fix 1 — Snapshot upsert (no more duplicates)**
+- `storeMetricSnapshots`, `storeLeadsSnapshot`, and `storeLinkedInSnapshot` in `lib/analytics/snapshot-store.ts` now check for an existing row with the same `source + period_start + snapshot_type` before inserting; if found, the metrics are updated in place rather than creating a duplicate. A shared `upsertMetricSnapshot()` helper implements this pattern for all sources
+- `youtube_snapshots` deduplication added — checks for an existing row with `pulled_at` within the period before inserting; updates the existing row if found
+- `storeLeadsSnapshot` now always runs (zero leads stored as 0) to preserve timeline continuity
+
+**Fix 2 — Leads/LinkedIn always stored**
+- In `app/api/analytics/pull/route.ts`, `storeLeadsSnapshot` and `storeLinkedInSnapshot` were previously inside the `if (results.length > 0)` guard (i.e., only ran when external API results were fetched). They are now called unconditionally — since they query Supabase directly, they don't depend on external API credentials
+
+**Fix 3 — New backfill endpoint**
+- `POST /api/analytics/backfill` added — admin-only. Accepts `{ from_date?: string }` (default `2026-01-01`). Enumerates all weekly periods from `from_date` to the most recently completed week, skips any that already have a snapshot, and pulls all API sources for the missing weeks. Returns a summary with how many weeks were found, already present, and backfilled
+
+**Fix 4 — Cleanup SQL script**
+- `scripts/cleanup-duplicate-snapshots.sql` added — run manually in the Supabase SQL editor to remove duplicate `metric_snapshots` rows (caused by multiple manual pulls before deduplication was in place). Includes a `SELECT` preview and commented-out `DELETE`
+
+**Fix 5 — Pull History page rebuilt**
+- Cron status section added: shows last successful weekly and monthly pull timestamps; notes about Vercel Hobby plan's 2-cron limit (7 crons configured; legacy `/api/cron/mis` entries may be consuming slots)
+- "Run weekly snapshot now" button — calls `/api/analytics/pull` with `period_type: 'weekly'` so any admin can trigger a snapshot immediately without waiting for the cron
+- "Backfill missing weeks" button — admin-only; calls `/api/analytics/backfill`, shows per-week results and a link to the Trends page
+- Metric Snapshots table added — shows the normalised `metric_snapshots` table used by the Trends page and Dashboard (replacing the legacy `mis_snapshots` view)
+
+**Fix 6 — Trends page threshold**
+- `ChartCard` now shows charts with 1+ data points (was 3+). For 1 point: renders a visible dot; for 2 points: renders a short line. A note below the chart explains how many more pulls are needed for a trend line. Empty state now links to Pull History for quick remediation
+
+---
+
 ## [v0.6.0] — 2026-04-05
 
 ### Added — LinkedIn snapshots + dashboard consolidation

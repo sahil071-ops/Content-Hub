@@ -154,13 +154,15 @@ async function runPull(periodType: MisPeriodTypeEnum, serviceSupabase: ReturnTyp
     try {
       await storeMetricSnapshots(results as Parameters<typeof storeMetricSnapshots>[0], periodType, startDate, endDate, serviceSupabase);
     } catch { /* non-critical — raw mis_snapshots already stored */ }
-    try {
-      await storeLeadsSnapshot(periodType, startDate, endDate, serviceSupabase);
-    } catch { /* non-critical */ }
-    try {
-      await storeLinkedInSnapshot(periodType, startDate, endDate, serviceSupabase);
-    } catch { /* non-critical */ }
   }
+
+  // Leads and LinkedIn always store — they query Supabase directly, not external APIs
+  try {
+    await storeLeadsSnapshot(periodType, startDate, endDate, serviceSupabase);
+  } catch { /* non-critical */ }
+  try {
+    await storeLinkedInSnapshot(periodType, startDate, endDate, serviceSupabase);
+  } catch { /* non-critical */ }
 
   // ── Generate AI highlights ─────────────────────────────────
   if (process.env.ANTHROPIC_API_KEY) {

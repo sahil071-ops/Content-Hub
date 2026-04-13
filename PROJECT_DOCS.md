@@ -13,10 +13,11 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 
 ## Current Version & Changelog Summary
 
-**Current version: 0.6.0** (package.json)
+**Current version: 0.7.0** (package.json)
 
 | Version | Date | Summary |
 |---------|------|---------|
+| v0.7.0 | 2026-04-13 | Snapshot deduplication (upsert), dynamic date ranges, backfill endpoint, Pull History cron status + trigger buttons, Trends threshold lowered to 1 data point |
 | v0.6.0 | 2026-04-05 | LinkedIn snapshot system, LinkedIn hero metric + detail card on dashboard, LinkedIn Trends charts, dashboard consolidation (cross-links, removed AI Highlights from MIS, sidebar restructure) |
 | v0.5.0 | 2026-04-04 | Snapshot-based historical tracking, Trends dashboard, AI highlights from 8-week history, YouTube subscriber growth, Brevo diagnostic |
 | v0.4.0 | 2026-04-03 | Dashboard redesign, 6 bug fixes, email verification, cron jobs, language tags |
@@ -74,6 +75,7 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 /api/admin/invite             → POST: invite new user by email
 /api/admin/content-types      → CRUD: content type registry
 /api/analytics/pull           → POST: manually pull all analytics sources
+/api/analytics/backfill       → POST: admin-only, backfill missing weekly snapshots since from_date
 /api/analytics/test-brevo     → POST: test Brevo API connection
 /api/analytics/dashboard-config → GET/POST/PUT: save dashboard layout
 /api/analytics/targets        → GET/POST/PUT: content tag targets
@@ -151,7 +153,7 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 | `B2_ACCESS_KEY_ID` | Backblaze B2 access key | ✅ Required |
 | `B2_SECRET_ACCESS_KEY` | Backblaze B2 secret | ✅ Required |
 | `B2_BUCKET_NAME` | Backblaze B2 bucket name | ✅ Required |
-| `CRON_SECRET` | Bearer token for Vercel cron routes | ✅ Required |
+| `CRON_SECRET` | Bearer token for Vercel cron routes — Vercel sends this automatically as `Authorization: Bearer <secret>` when calling cron endpoints; must be set in Vercel dashboard env vars for cron security | ✅ Required |
 | `ANTHROPIC_API_KEY` | Claude API — enrichment, insights, spam | ⚠️ Optional but most AI features fail without it |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | GCP service account for GA4/GSC | ⚠️ Optional — analytics MIS won't pull |
 | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | GCP service account private key (PEM) | ⚠️ Optional — Vercel encoding quirks handled in google-auth.ts |
@@ -189,7 +191,8 @@ Axis Content Hub is a B2B marketing intelligence and content management platform
 
 ## Known Issues & Tech Debt
 
-1. **Brevo connectivity** — API key and headers are correct; root cause of intermittent failures not yet identified. Enhanced error logging (status + body) added in v0.4.0 to aid diagnosis. Check Vercel function logs after next pull attempt.
+1. **Vercel Hobby cron limit** — Vercel Hobby plan allows max 2 cron jobs. The current `vercel.json` defines 7 crons; the legacy `/api/cron/mis` entries (4 crons) may be consuming the available slots, preventing `snapshot-weekly` and `snapshot-monthly` from firing. Fix: remove the legacy `mis` cron entries from `vercel.json`, or upgrade to Vercel Pro. Use the "Run weekly snapshot now" button on Pull History page as a workaround, or use the Backfill button to populate historical data.
+2. **Brevo connectivity** — API key and headers are correct; root cause of intermittent failures not yet identified. Enhanced error logging (status + body) added in v0.4.0 to aid diagnosis. Check Vercel function logs after next pull attempt.
 2. **YouTube per-period watch time** — YouTube Data API v3 with an API key cannot return per-period watch time; requires OAuth (YouTube Analytics API). Zero-value cards now hidden. Fix: add OAuth flow for YouTube.
 3. **Abstract API rate limit** — Free tier is 100 verifications/day. High-volume Zoho pulls may exhaust this. Paid plan needed for production scale.
 4. **Google private key encoding on Vercel** — PEM key requires special handling (see `lib/analytics/google-auth.ts`). If GA4/GSC stops working after a re-deploy, check that the env var hasn't been re-escaped.
@@ -267,6 +270,7 @@ vercel.json                                → Cron job schedules (5 jobs, all o
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-04-13 | v0.7.0 | Snapshot deduplication: all `storeMetricSnapshots`, `storeLeadsSnapshot`, `storeLinkedInSnapshot` calls now use check-then-upsert — safe to call multiple times for same period. `storeLeadsSnapshot` + `storeLinkedInSnapshot` moved outside `if (results.length > 0)` block in `pull/route.ts` so they always run. `GET /api/analytics/backfill` added — admin-only, pulls all missing weekly periods since a given from_date, skips already-stored periods. Pull History page rebuilt: cron status section (last weekly/monthly timestamp), "Run weekly snapshot now" button (proxies through pull API), "Backfill missing weeks" button with progress. Trends `ChartCard` threshold lowered from 3 to 1 — shows dot for 1 point, line for 2, note for <3. `scripts/cleanup-duplicate-snapshots.sql` added. Note: Vercel Hobby plan allows max 2 crons; 7 crons in `vercel.json` may cause snapshot crons not to fire — remove legacy `/api/cron/mis` entries if needed. |
 | 2026-04-05 | v0.6.0 | LinkedIn snapshot system: `storeLinkedInSnapshot()` aggregates `linkedin_posts` by period (published posts, impressions, engagement rate, per-account breakdown, best post); called from weekly/monthly crons + manual pull. LinkedIn hero metric (6th card) + detail card on dashboard (4-across scorecards, best-post callout, per-account breakdown). LinkedIn Trends charts (Chart 7: engagement rate line, Chart 8: impressions stacked bar). Dashboard cross-links to MIS sections. Removed AI Highlights from `/analytics/mis` (only on `/dashboard`); added dismissible banner + breadcrumb to MIS. Sidebar restructured: Dashboard standalone, Content section added, Analytics items reordered (Trends first). |
 | 2026-04-04 | v0.5.0 | Parts 1-6: Brevo diagnostic endpoint + UI button; metric_snapshots + youtube_snapshots tables (migration 015); snapshot-weekly + snapshot-monthly cron endpoints; manual pull writes to metric_snapshots; dashboard comparison uses snapshot deltas; YouTube subscriber growth from snapshots; /analytics/trends page (6 charts); AI highlights rewritten to use 8-week snapshot history; backfill script for legacy mis_snapshots |
 | 2026-04-03 | v0.4.0 | Fixed 6 bugs (LinkedIn dates/payload/AI rules/Zoho dates/YouTube zeros/Brevo errors); added email verification via Abstract API; added language tags; added Vercel cron jobs; rebuilt /dashboard with AI highlights + number strip + detail cards; added PROJECT_DOCS.md |
