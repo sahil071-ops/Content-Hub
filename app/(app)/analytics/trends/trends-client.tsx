@@ -24,6 +24,10 @@ const COLORS = {
 const LEADS_PALETTE = ['#8B5CF6', '#6D28D9', '#A78BFA', '#C4B5FD', '#7C3AED'];
 const LI_ACCOUNT_PALETTE = ['#0077B5', '#00A0DC', '#0288D1', '#039BE5', '#006097'];
 
+const TOOLTIP_CONTENT_STYLE = { backgroundColor: '#1a1a2e', border: '1px solid #374151', borderRadius: '8px', color: '#f9fafb', fontSize: '13px' };
+const TOOLTIP_LABEL_STYLE = { color: '#d1d5db', marginBottom: '4px' };
+const TOOLTIP_ITEM_STYLE = { color: '#f9fafb' };
+
 type SourceFilter = 'all' | 'ga4' | 'gsc' | 'youtube' | 'brevo' | 'leads' | 'linkedin';
 type PeriodFilter = 'weekly' | 'monthly';
 type RangeFilter  = '8w' | '6m' | '12m' | 'all';
@@ -359,7 +363,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={tickFmt} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [(v as number).toLocaleString(), '']} />
+                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [(v as number).toLocaleString(), '']} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                 <Line type="monotone" dataKey="ga4_main" name="Main Site" stroke={COLORS.ga4_main} dot={ga4Data.length < 3 ? { r: 3 } : false} strokeWidth={2} connectNulls />
                 <Line type="monotone" dataKey="ga4_es"   name="ES Site"   stroke={COLORS.ga4_es}   dot={ga4Data.length < 3 ? { r: 3 } : false} strokeWidth={2} connectNulls />
@@ -381,7 +385,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={tickFmt} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [(v as number).toLocaleString(), '']} />
+                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [(v as number).toLocaleString(), '']} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                 <Line type="monotone" dataKey="gsc_main" name="Main Site" stroke={COLORS.gsc_main} dot={gscData.length < 3 ? { r: 3 } : false} strokeWidth={2} connectNulls />
                 <Line type="monotone" dataKey="gsc_es"   name="ES Site"   stroke={COLORS.gsc_es}   dot={gscData.length < 3 ? { r: 3 } : false} strokeWidth={2} connectNulls />
@@ -403,7 +407,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={tickFmt} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [(v as number).toLocaleString(), 'Views']} />
+                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [(v as number).toLocaleString(), 'Views']} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                 <Bar dataKey="views" name="Views" fill={COLORS.youtube} radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -433,6 +437,9 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <Tooltip
                   labelFormatter={(v) => { try { return format(parseISO(String(v ?? '')), 'dd MMM yyyy'); } catch { return String(v ?? ''); } }}
                   formatter={(v: unknown) => [(v as number).toLocaleString(), 'Subscribers']}
+                  contentStyle={TOOLTIP_CONTENT_STYLE}
+                  labelStyle={TOOLTIP_LABEL_STYLE}
+                  itemStyle={TOOLTIP_ITEM_STYLE}
                 />
                 <Line type="monotone" dataKey="subscribers" name="Subscribers" stroke={COLORS.subscribers} dot={ytSubData.length < 3 ? { r: 3 } : false} strokeWidth={2} />
               </LineChart>
@@ -453,7 +460,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={tickFmt} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, 'auto']} />
-                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [`${(v as number).toFixed(1)}%`, 'Open Rate']} />
+                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [`${(v as number).toFixed(1)}%`, 'Open Rate']} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                 <Line type="monotone" dataKey="open_rate" name="Open Rate" stroke={COLORS.brevo} dot={brevoData.length < 3 ? { r: 3 } : false} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
@@ -473,7 +480,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={tickFmt} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown, name: unknown) => [(v as number).toLocaleString(), String(name)]} />
+                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown, name: unknown) => [(v as number).toLocaleString(), String(name)]} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                 {formKeys.length > 1 && <Legend iconType="rect" iconSize={8} wrapperStyle={{ fontSize: 11 }} />}
                 {formKeys.length > 0 ? (
                   formKeys.map((key, i) => (
@@ -500,7 +507,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={tickFmt} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} unit="%" domain={[0, 'auto']} />
-                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, '']} />
+                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, '']} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                 {liAccountKeys.length > 0 && <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />}
                 <Line type="monotone" dataKey="overall" name="Overall" stroke="#0077B5" strokeWidth={2} dot={liEngagementData.length < 3 ? { r: 3 } : false} strokeDasharray="4 2" />
                 {liAccountKeys.map((name, i) => (
@@ -533,7 +540,7 @@ export function TrendsClient({ snapshotRows, ytSnapshotRows }: TrendsClientProps
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="date" tickFormatter={tickFmt} tick={{ fontSize: 10 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown, name: unknown) => [(v as number).toLocaleString(), String(name)]} />
+                <Tooltip labelFormatter={tooltipLabel} formatter={(v: unknown, name: unknown) => [(v as number).toLocaleString(), String(name)]} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                 {liAccountKeys.length > 1 && <Legend iconType="rect" iconSize={8} wrapperStyle={{ fontSize: 11 }} />}
                 {liAccountKeys.length > 0 ? (
                   liAccountKeys.map((name, i) => (

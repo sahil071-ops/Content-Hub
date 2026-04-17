@@ -14,6 +14,10 @@ import {
 import type { LinkedInPost, LinkedInAccount } from '@/types/database';
 
 const COLOURS = ['#2323A3', '#7C3AED', '#059669', '#D97706', '#DC2626', '#0891B2'];
+const TOOLTIP_CONTENT_STYLE = { backgroundColor: '#1a1a2e', border: '1px solid #374151', borderRadius: '8px', color: '#f9fafb', fontSize: '13px' };
+const TOOLTIP_LABEL_STYLE = { color: '#d1d5db', marginBottom: '4px' };
+const TOOLTIP_ITEM_STYLE = { color: '#f9fafb' };
+
 const FORMAT_COLOURS: Record<string, string> = {
   text: '#64748b',
   image: '#7C3AED',
@@ -176,7 +180,7 @@ export default function LinkedInDashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} />
                     <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={45} />
-                    <Tooltip />
+                    <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     {data.accounts.map((a, i) => (
                       <Line
@@ -204,7 +208,7 @@ export default function LinkedInDashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} />
                     <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={40} unit="%" />
-                    <Tooltip formatter={(v: any) => `${(+v).toFixed(2)}%`} />
+                    <Tooltip formatter={(v: any) => `${(+v).toFixed(2)}%`} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     {data.accounts.map((a, i) => (
                       <Line
@@ -247,7 +251,7 @@ export default function LinkedInDashboardPage() {
                         <Cell key={entry.name} fill={FORMAT_COLOURS[entry.name] || '#6B7280'} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -264,7 +268,7 @@ export default function LinkedInDashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="format" tick={{ fontSize: 10 }} tickLine={false} />
                     <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} unit="%" width={35} />
-                    <Tooltip formatter={(v: any) => `${(+v).toFixed(2)}%`} />
+                    <Tooltip formatter={(v: any) => `${(+v).toFixed(2)}%`} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                     <Bar dataKey="avg_engagement" radius={[3, 3, 0, 0]}>
                       {formatEngagement.map((entry) => (
                         <Cell key={entry.format} fill={FORMAT_COLOURS[entry.format] || '#6B7280'} />
@@ -286,7 +290,7 @@ export default function LinkedInDashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
                     <XAxis type="number" tick={{ fontSize: 10 }} tickLine={false} unit="%" />
                     <YAxis type="category" dataKey="topic" tick={{ fontSize: 10 }} tickLine={false} width={80} />
-                    <Tooltip formatter={(v: any) => `${(+v).toFixed(2)}%`} />
+                    <Tooltip formatter={(v: any) => `${(+v).toFixed(2)}%`} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                     <Bar dataKey="avg_engagement" fill="#2323A3" radius={[0, 3, 3, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -311,6 +315,9 @@ export default function LinkedInDashboardPage() {
                       name === 'engagement' ? `${(+v).toFixed(2)}%` : (+v).toLocaleString(),
                       name === 'engagement' ? 'Eng. Rate' : 'Impressions',
                     ]}
+                    contentStyle={TOOLTIP_CONTENT_STYLE}
+                    labelStyle={TOOLTIP_LABEL_STYLE}
+                    itemStyle={TOOLTIP_ITEM_STYLE}
                   />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
                   {Object.keys(FORMAT_COLOURS).map((fmt) => (
@@ -369,7 +376,7 @@ export default function LinkedInDashboardPage() {
                           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                           <XAxis dataKey="date" tick={{ fontSize: 9 }} tickLine={false} />
                           <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
-                          <Tooltip />
+                          <Tooltip contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
                           <Bar dataKey="impressions" fill="#2323A3" radius={[2, 2, 0, 0]} opacity={0.8} />
                         </BarChart>
                       </ResponsiveContainer>

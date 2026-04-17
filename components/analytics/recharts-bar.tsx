@@ -5,6 +5,10 @@ import {
 } from 'recharts';
 import { useRouter, usePathname } from 'next/navigation';
 
+const TOOLTIP_CONTENT_STYLE = { backgroundColor: '#1a1a2e', border: '1px solid #374151', borderRadius: '8px', color: '#f9fafb', fontSize: '13px' };
+const TOOLTIP_LABEL_STYLE = { color: '#d1d5db', marginBottom: '4px' };
+const TOOLTIP_ITEM_STYLE = { color: '#f9fafb' };
+
 interface BarItem {
   name: string;
   value: number;
@@ -45,7 +49,7 @@ export function RechartsBar({
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />
           <XAxis type="number" tick={{ fontSize: 11 }} />
           <YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 11 }} />
-          <Tooltip formatter={(v: any) => [(v as number).toLocaleString(), label || 'Count']} />
+          <Tooltip formatter={(v: any) => [(v as number).toLocaleString(), label || 'Count']} contentStyle={TOOLTIP_CONTENT_STYLE} labelStyle={TOOLTIP_LABEL_STYLE} itemStyle={TOOLTIP_ITEM_STYLE} />
           <Bar dataKey="value" radius={[0, 4, 4, 0]} cursor={filterKey ? 'pointer' : 'default'} onClick={(d) => handleClick(d as unknown as BarItem)}>
             {data.map((_, i) => <Cell key={i} fill={color} fillOpacity={0.85 - i * 0.02} />)}
           </Bar>

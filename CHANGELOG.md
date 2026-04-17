@@ -6,6 +6,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [v0.7.1] — 2026-04-17
+
+### Fixed — Chart tooltip dark theme styling
+
+- Applied dark-theme `contentStyle`, `labelStyle`, and `itemStyle` to every Recharts `<Tooltip />` across all chart pages: `/analytics/trends` (8 charts), `/linkedin/dashboard` (7 charts), and shared components `RechartsBar`, `RechartsLine`, `RechartsDonut` (used on `/analytics/mis` and content pages)
+- Tooltips now show light text (`#f9fafb`) on a dark navy background (`#1a1a2e`) with a subtle border, matching the app's dark theme — previously the default white background made them unreadable
+- Tooltip style constants defined at module scope in each file to avoid repetition
+
+---
+
 ## [v0.7.0] — 2026-04-13
 
 ### Fixed — Snapshot deduplication, cron reliability, Trends data access
